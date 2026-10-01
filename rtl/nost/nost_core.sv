@@ -145,8 +145,18 @@ module nost_core (
     logic [19:3] arom_line;
     logic [15:0] dbg_lat_rd, dbg_ym, dbg_nmi, dbg_zmiss;
 `ifdef NOST_SIM_NO_SOUND
-    // simulation-only: video/CPU benches without the Z80 board
-    assign snd = '0; assign zrom_req = 1'b0; assign arom_req = 1'b0; assign latch2 = 8'h00;
+    // simulation-only: video/CPU benches without the Z80 board. Latch 2 echoes each command ~10 us
+    // after it is written, as the Z80 program does once running (boot handshake not modelled).
+    logic [9:0] echo_cnt = '0;
+    logic [7:0] echo_v = 8'h00;
+    always_ff @(posedge clk) begin
+        if (latch_wr) begin echo_cnt <= 10'd1000; echo_v <= latch; end
+        else if (echo_cnt != 0) begin
+            echo_cnt <= echo_cnt - 10'd1;
+            if (echo_cnt == 10'd1) latch2 <= echo_v;
+        end
+    end
+    assign snd = '0; assign zrom_req = 1'b0; assign arom_req = 1'b0;
     assign zrom_line = '0; assign arom_line = '0;
     assign {dbg_lat_rd, dbg_ym, dbg_nmi, dbg_zmiss} = '0;
 `else

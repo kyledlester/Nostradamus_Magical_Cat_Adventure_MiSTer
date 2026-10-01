@@ -48,28 +48,40 @@ module nost_sprites (
     wire signed [16:0] glx = $signed({1'b0, gx}) - 17'sh0184;
     wire signed [16:0] gly = $signed({1'b0, gy}) - 17'sh01F1;
 
+    // stage 1 (registered after the buffer RAM): raw entry and the screen offsets of its first row /
+    // column; stage 2: range tests, duplicate filter, FIFO write. (Two stages keep the RAM output
+    // and the comparisons in separate clocks for timing.)
     wire [15:0] e0 = sbuf_q[15:0];
     wire [15:0] e2 = sbuf_q[47:32];
     wire [15:0] e3 = sbuf_q[63:48];
-    wire signed [16:0] ey  = {{7{e3[9]}}, e3[9:0]};
-    wire signed [16:0] dy  = $signed({9'd0, y}) + gly - ey;      // row within the sprite
-    wire        [7:0]  eh  = {e3[15:12], 4'd0};
-    wire signed [16:0] ex  = {{7{e2[9]}}, e2[9:0]} - glx;          // screen x of column 0
-    wire        [7:0]  ew  = {e2[15:12], 4'd0};
-    wire hit = pv && e3 != e0 && e2[15:12] != 0 && e3[15:12] != 0 &&
-               dy >= 0 && dy < $signed({9'd0, eh}) &&
-               ex < 17'sd320 && ex + $signed({9'd0, ew}) > 0;
+    logic [63:0] q1;
+    logic        v1;
+    logic signed [16:0] dy1, ex1;       // row within the sprite, screen x of column 0
+    always_ff @(posedge clk) begin
+        q1  <= sbuf_q;
+        v1  <= pv && !rst && !start;
+        dy1 <= $signed({9'd0, y}) + gly - $signed({{7{e3[9]}}, e3[9:0]});
+        ex1 <= $signed({{7{e2[9]}}, e2[9:0]}) - glx;
+    end
+    wire [15:0] q1w0 = q1[15:0];
+    wire [15:0] q1w2 = q1[47:32];
+    wire [15:0] q1w3 = q1[63:48];
+    wire        [7:0]  eh  = {q1w3[15:12], 4'd0};
+    wire        [7:0]  ew  = {q1w2[15:12], 4'd0};
+    wire hit = v1 && q1w3 != q1w0 && q1w2[15:12] != 0 && q1w3[15:12] != 0 &&
+               dy1 >= 0 && dy1 < $signed({9'd0, eh}) &&
+               ex1 < 17'sd320 && ex1 + $signed({9'd0, ew}) > 0;
 
     // data row: MAME consumes rows in drawing order, so with flipy row k of the data is drawn at
     // screen row height - 1 - k
-    wire [7:0] krow = e0[6] ? eh - 8'd1 - dy[7:0] : dy[7:0];
+    wire [7:0] krow = q1w0[6] ? eh - 8'd1 - dy1[7:0] : dy1[7:0];
 
     // FIFO of hits: {w0, w1, w2, data row}
-    localparam int FD = 8;
+    localparam int FD = 16;
     logic [55:0] fifo [FD];
-    logic  [3:0] f_wr, f_rd;
-    wire  [3:0]  f_cnt = f_wr - f_rd;
-    wire         f_full = f_cnt >= 4'(FD - 2);   // room for the entries still in the pipeline
+    logic  [4:0] f_wr, f_rd;
+    wire  [4:0]  f_cnt = f_wr - f_rd;
+    wire         f_full = f_cnt >= 5'(FD - 4);   // room for the entries still in the pipeline
     wire         f_empty = f_cnt == 0;
     logic        f_pop;
 
@@ -93,19 +105,22 @@ module nost_sprites (
                 pv   <= 1'b0;
                 scan_done <= 1'b0;
                 last_v <= 1'b0;
-            end else if (!scan_done) begin
+            end else begin
                 if (hit) begin
-                    last_hit <= sbuf_q;
+                    last_hit <= q1;
                     last_v   <= 1'b1;
                 end
-                if (hit && !(last_v && last_hit == sbuf_q)) begin
-                    fifo[f_wr[2:0]] <= {sbuf_q[15:0], sbuf_q[31:16], sbuf_q[47:32], krow};
-                    f_wr <= f_wr + 4'd1;
+                if (hit && !(last_v && last_hit == q1)) begin
+                    fifo[f_wr[3:0]] <= {q1[15:0], q1[31:16], q1[47:32], krow};
+                    f_wr <= f_wr + 5'd1;
                 end
-                if (!f_full) begin
-                    pv <= !scan[11];
-                    if (scan[11]) scan_done <= 1'b1;
-                    else scan <= scan + 12'd1;
+                if (!scan_done) begin
+                    if (!f_full) begin
+                        pv <= !scan[11];
+                        if (scan[11]) scan_done <= 1'b1;
+                        else scan <= scan + 12'd1;
+                    end else
+                        pv <= 1'b0;
                 end else
                     pv <= 1'b0;
             end
@@ -136,12 +151,12 @@ module nost_sprites (
                 logic [55:0] f;
                 logic [15:0] w1, w2;
                 logic  [7:0] k;
-                f   = fifo[f_rd[2:0]];
+                f   = fifo[f_rd[3:0]];
                 d0  <= f[55:40];
                 w1  = f[39:24];
                 w2  = f[23:8];
                 k   = f[7:0];
-                f_rd  <= f_rd + 4'd1;
+                f_rd  <= f_rd + 5'd1;
                 f_pop <= 1'b1;
                 nchunk <= w2[15:12] - 4'd1;
                 x0  <= {{7{w2[9]}}, w2[9:0]} - glx;
@@ -223,5 +238,5 @@ module nost_sprites (
         end
     end
 
-    assign busy = !scan_done || !f_empty || dst != D_IDLE || w_busy || f_pop;
+    assign busy = !scan_done || pv || v1 || !f_empty || dst != D_IDLE || w_busy || f_pop;
 endmodule

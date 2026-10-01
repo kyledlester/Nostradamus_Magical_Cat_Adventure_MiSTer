@@ -16,8 +16,12 @@ module nost_dpram #(
     output logic [DW-1:0] b_dout
 );
     logic [DW-1:0] mem [0:(1<<AW)-1];
-    // power-up contents 0 (Cyclone V M10K without an init file), unless INIT is given
-    initial if (INIT != "") $readmemh(INIT, mem); else for (int i = 0; i < (1 << AW); i++) mem[i] = '0;
+    // power-up contents 0 (Cyclone V M10K without an init file), unless INIT is given; the zero
+    // fill is for the simulator only (Quartus limits elaboration loops; the M10K starts at 0)
+    initial if (INIT != "") $readmemh(INIT, mem);
+    // synthesis translate_off
+    initial if (INIT == "") for (int i = 0; i < (1 << AW); i++) mem[i] = '0;
+    // synthesis translate_on
     always @(posedge clk) begin
         if (a_we) mem[a_addr] <= a_din;
         a_dout <= mem[a_addr];
@@ -39,8 +43,12 @@ module nost_sdpram #(
     output logic [DW-1:0] dout
 );
     logic [DW-1:0] mem [0:(1<<AW)-1];
-    // power-up contents 0 (Cyclone V M10K without an init file), unless INIT is given
-    initial if (INIT != "") $readmemh(INIT, mem); else for (int i = 0; i < (1 << AW); i++) mem[i] = '0;
+    // power-up contents 0 (Cyclone V M10K without an init file), unless INIT is given; the zero
+    // fill is for the simulator only (Quartus limits elaboration loops; the M10K starts at 0)
+    initial if (INIT != "") $readmemh(INIT, mem);
+    // synthesis translate_off
+    initial if (INIT == "") for (int i = 0; i < (1 << AW); i++) mem[i] = '0;
+    // synthesis translate_on
     always @(posedge clk) begin
         if (we) mem[w_addr] <= din;
         dout <= mem[r_addr];
@@ -59,7 +67,9 @@ module nost_spram16 #(
 );
     logic [7:0] hi [0:(1<<AW)-1];
     logic [7:0] lo [0:(1<<AW)-1];
+    // synthesis translate_off
     initial for (int i = 0; i < (1 << AW); i++) begin hi[i] = 8'h00; lo[i] = 8'h00; end
+    // synthesis translate_on
     always @(posedge clk) begin
         if (we[1]) hi[addr] <= din[15:8];
         if (we[0]) lo[addr] <= din[7:0];
@@ -82,8 +92,12 @@ module nost_dcram #(
     output logic [DW-1:0] dout
 );
     logic [DW-1:0] mem [0:(1<<AW)-1];
-    // power-up contents 0 (Cyclone V M10K without an init file), unless INIT is given
-    initial if (INIT != "") $readmemh(INIT, mem); else for (int i = 0; i < (1 << AW); i++) mem[i] = '0;
+    // power-up contents 0 (Cyclone V M10K without an init file), unless INIT is given; the zero
+    // fill is for the simulator only (Quartus limits elaboration loops; the M10K starts at 0)
+    initial if (INIT != "") $readmemh(INIT, mem);
+    // synthesis translate_off
+    initial if (INIT == "") for (int i = 0; i < (1 << AW); i++) mem[i] = '0;
+    // synthesis translate_on
     always @(posedge wclk) if (we) mem[w_addr] <= din;
     always @(posedge rclk) dout <= mem[r_addr];
 endmodule
@@ -123,7 +137,9 @@ module nost_tdpram #(
     input  logic [DW-1:0] b_din
 );
     logic [DW-1:0] mem [0:(1<<AW)-1];
+    // synthesis translate_off
     initial for (int i = 0; i < (1 << AW); i++) mem[i] = '0;
+    // synthesis translate_on
     always @(posedge clk) begin
         if (a_we) mem[a_addr] <= a_din;
         a_dout <= mem[a_addr];
