@@ -1,0 +1,3 @@
+# Core PLL, included by sys/pll_q17.qip (the framework expects rtl/pll.qip).
+# A directly instantiated altera_pll (rtl/nost/nost_pll.sv), not a MegaWizard IP variation.
+set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) nost/nost_pll.sv]

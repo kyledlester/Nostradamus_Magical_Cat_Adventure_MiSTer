@@ -32,6 +32,9 @@ spec() {
   case "$1" in
     boot)  echo "tb_boot||cpu|+define+NOST_SIM_ROM|$CLK $MAIN sim/tb/tb_boot.sv" ;;
     bootc) echo "tb_boot||cpu||$CLK $MAIN sim/tb/tb_boot.sv" ;;
+    sound) echo "tb_sound|$T80|||rtl/nost/nost_ram.sv $SOUND $JT10 sim/tb/tb_sound.sv" ;;
+    loader) python scripts/mk_sdram_sim.py build/sim/sdram_sim.sv
+         echo "tb_loader||||rtl/nost/nost_loader.sv rtl/nost/nost_sdram_arb.sv build/sim/sdram_sim.sv sim/models/sdr_sdram_model.sv sim/tb/tb_loader.sv" ;;
     render) python scripts/mk_sdram_sim.py build/sim/sdram_sim.sv
          echo "tb_render||||$CLK rtl/nost/nost_ram.sv $VIDEO rtl/nost/nost_sdram_arb.sv build/sim/sdram_sim.sv sim/models/sdr_sdram_model.sv sim/tb/tb_render.sv" ;;
     *) echo "" ;;

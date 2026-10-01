@@ -1,0 +1,154 @@
+// M5: Z80 sound board (nost_sound: T80, jt10 YM2610, ROM/ADPCM caches) against MAME.
+// The 68000's sound-latch writes are replayed at MAME's times (scripts/mame/sound_trace.lua ->
+// local/sound_trace.txt "M" lines); every Z80 I/O write (YM2610 ports 00-03, bank 40, latch 2 80)
+// is compared in order with MAME's ("Z ... W" lines): port and data must match, and the time
+// difference is reported. Status reads are not compared (their count depends on busy timing).
+// Bench time 0 = MAME's watchdog reset at 3.0 s, which resets the Z80 and the YM2610 (the trace's
+// earlier part is the cold-boot run that the reset discards).
+// Simulation clock: 16 MHz (1 clk = 62.5 ns), ce_8m every 2nd and ce_4m every 4th clock - the board
+// only sees clock enables, so this keeps the production 8 MHz / 4 MHz rates at 1/3 of the cost.
+// clk_sys = clk_snd here; Z80 ROM and ADPCM-A lines are served from local/sim/*.hex with
+// +ROMLAT=<clocks> latency (default 6 = 375 ns, about the production SDRAM path).
+// Audio: build/sim/sound.raw (signed 16-bit mono, 1 MHz).
+// Plusargs: +MS=<milliseconds to run after the reset> (default 400), +N=<writes, 0 = all>,
+// +STRACE=<file>, +SOUNDRAW=<file>.
+`timescale 1ns/1ps
+module tb_sound;
+    logic clk = 0;
+    always #31.25 clk = ~clk;
+    logic reset = 1;
+
+    logic [7:0] latch = 8'h00, latch2;
+    logic latch_wr = 0;
+    logic zrom_req, arom_req, zrom_ack = 0, arom_ack = 0;
+    logic [17:3] zrom_line;
+    logic [19:3] arom_line;
+    logic [63:0] zrom_data, arom_data;
+    logic signed [15:0] snd;
+    logic [15:0] c_lat, c_ym, c_nmi, c_zmiss;
+
+    nost_sound #(.CE_NUM(1), .CE_DEN(2)) dut (
+        .clk(clk), .clk_snd(clk), .reset(reset), .pause(1'b0),
+        .latch(latch), .latch_wr(latch_wr), .latch2(latch2),
+        .zrom_req(zrom_req), .zrom_line(zrom_line), .zrom_ack(zrom_ack), .zrom_data(zrom_data),
+        .arom_req(arom_req), .arom_line(arom_line), .arom_ack(arom_ack), .arom_data(arom_data),
+        .snd(snd), .dbg_latch_reads(c_lat), .dbg_ym_writes(c_ym), .dbg_nmis(c_nmi), .dbg_zmisses(c_zmiss));
+
+    // ROM line responders
+    logic [7:0] zrom [0:262143];
+    logic [7:0] arom [0:1048575];
+    initial begin
+        $readmemh("local/sim/soundcpu.hex", zrom);
+        $readmemh("local/sim/adpcma.hex", arom);
+    end
+    int romlat = 6, zc = 0, ac = 0, alate = 0;
+    initial void'($value$plusargs("ROMLAT=%d", romlat));
+    always_ff @(posedge clk) begin
+        zrom_ack <= 1'b0;
+        arom_ack <= 1'b0;
+        if (zrom_req && !zrom_ack) begin
+            if (zc >= romlat) begin
+                for (int i = 0; i < 8; i++) zrom_data[i*8 +: 8] <= zrom[{zrom_line, 3'(i)}];
+                zrom_ack <= 1'b1; zc <= 0;
+            end else zc <= zc + 1;
+        end
+        if (arom_req && !arom_ack) begin
+            if (ac >= romlat) begin
+                for (int i = 0; i < 8; i++) arom_data[i*8 +: 8] <= arom[{arom_line, 3'(i)}];
+                arom_ack <= 1'b1; ac <= 0;
+            end else ac <= ac + 1;
+        end
+    end
+
+    // MAME trace (times relative to the 3.0 s watchdog reset)
+    real   lat_t [$]; int lat_v [$];
+    real   w_t [$]; int w_a [$]; int w_d [$];
+    int    run_ms = 400, max_n = 0;
+    int    afd;
+    string strace, sraw;
+    initial begin
+        int fd, r; string kind, rw; real tt; int a, v; real t0;
+        void'($value$plusargs("MS=%d", run_ms));
+        void'($value$plusargs("N=%d", max_n));
+        if (!$value$plusargs("STRACE=%s", strace)) strace = "local/sound_trace.txt";
+        fd = $fopen(strace, "r");
+        if (fd == 0) begin $display("FAIL M5_SOUND: no %s", strace); $finish; end
+        t0 = -1;
+        while (!$feof(fd)) begin
+            r = $fscanf(fd, "%s", kind);
+            if (r != 1) break;
+            if (kind == "X") begin r = $fscanf(fd, "%f %s\n", tt, rw); if (t0 < 0) t0 = tt; end
+            else if (kind == "M") begin r = $fscanf(fd, "%f %h\n", tt, v);
+                if (t0 >= 0) begin lat_t.push_back(tt - t0); lat_v.push_back(v); end end
+            else begin
+                r = $fscanf(fd, "%f %s %h %h\n", tt, rw, a, v);
+                if (t0 >= 0 && rw == "W") begin w_t.push_back(tt - t0); w_a.push_back(a); w_d.push_back(v); end
+            end
+        end
+        $fclose(fd);
+        if (!$value$plusargs("SOUNDRAW=%s", sraw)) sraw = "build/sim/sound.raw";
+        afd = $fopen(sraw, "wb");
+        $display("trace: reset at %.0f us; %0d latch writes, %0d Z80 writes after it", t0, lat_t.size(), w_t.size());
+        repeat (8) @(posedge clk);
+        reset <= 0;
+    end
+
+    // time in microseconds since reset release: 16 clocks per us
+    longint clks = 0;
+    always @(posedge clk) if (!reset) clks++;
+    real t_us;
+    always @* t_us = clks / 16.0;
+
+    int li = 0;
+    always @(posedge clk) begin
+        latch_wr <= 1'b0;
+        if (!reset && li < lat_t.size() && lat_t[li] <= t_us) begin
+            latch <= lat_v[li]; latch_wr <= 1'b1; li++;
+        end
+    end
+
+    // compare Z80 I/O writes
+    int wi = 0, errors = 0; real maxdt = 0;
+    logic wr_n_d = 1;
+    always @(posedge clk) begin
+        wr_n_d <= dut.wr_n;
+        if (!reset && wr_n_d && !dut.wr_n && !dut.iorq_n) begin
+            if (wi < w_t.size()) begin
+                real dt;
+                dt = t_us - w_t[wi];
+                if (dt < 0) dt = -dt;
+                if (dt > maxdt) maxdt = dt;
+                if (dut.A[7:0] != w_a[wi] || dut.cpu_do != w_d[wi]) begin
+                    errors++;
+                    if (errors <= 5) $display("MISMATCH write %0d at %.1f us: FPGA %02x=%02x MAME %02x=%02x (MAME t=%.1f)",
+                        wi, t_us, dut.A[7:0], dut.cpu_do, w_a[wi], w_d[wi], w_t[wi]);
+                end
+            end
+            if ($test$plusargs("SHOWW") && wi < w_t.size()) $display("W %0d FPGA %.2f MAME %.2f %02x=%02x", wi, t_us, w_t[wi], dut.A[7:0], dut.cpu_do);
+            wi++;
+            if (wi % 2000 == 0) $display("progress: %0d writes, %.0f ms, max offset %.1f us, errors %0d", wi, t_us / 1000.0, maxdt, errors);
+            if (max_n != 0 && wi >= max_n) finish_run();
+        end
+    end
+
+    // ADPCM-A data not yet filled when the chip latches it (the byte would be wrong)
+    always @(posedge clk) if (!reset && dut.ce_8m && !dut.adpcma_roe_n && !dut.amatch) alate++;
+
+    always @(posedge clk) if (!reset && clks % 16 == 0) $fwrite(afd, "%c%c", snd[7:0], snd[15:8]);
+    always @(posedge clk) if (t_us >= run_ms * 1000.0) finish_run();
+
+    task automatic finish_run();
+        int expected;
+        expected = 0;
+        while (expected < w_t.size() && w_t[expected] <= t_us) expected++;
+        $fclose(afd);
+        $display("ADPCM-A cen ticks with the byte not yet filled: %0d; Z80 ROM misses %0d", alate, c_zmiss);
+        if (errors == 0 && wi > 0 && (wi >= expected - 2 && wi <= expected + 2))
+            $display("PASS M5_SOUND: %.0f ms, %0d Z80 I/O writes identical to MAME in order (MAME %0d by now, max time offset %.1f us); latch reads %0d, NMIs %0d, latch values replayed %0d",
+                t_us / 1000.0, wi, expected, maxdt, c_lat, c_nmi, li);
+        else
+            $display("FAIL M5_SOUND: %0d mismatches, %0d writes (MAME %0d by %.0f ms), max time offset %.1f us",
+                errors, wi, expected, t_us / 1000.0, maxdt);
+        $finish;
+    endtask
+endmodule

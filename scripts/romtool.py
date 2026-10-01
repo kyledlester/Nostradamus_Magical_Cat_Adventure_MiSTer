@@ -318,6 +318,7 @@ def main():
         mc = regs["maincpu"]
         write_hex16(os.path.join(d, "maincpu.hex"), [(mc[2 * i] << 8) | mc[2 * i + 1] for i in range(len(mc) // 2)])
         write_hex8(os.path.join(d, "soundcpu.hex"), regs["soundcpu"])
+        write_hex8(os.path.join(d, "adpcma.hex"), regs["adpcma"])
         print("simulation images written to", d)
     elif a.cmd == "mracheck":
         got = interpret_mra(mra, data)
