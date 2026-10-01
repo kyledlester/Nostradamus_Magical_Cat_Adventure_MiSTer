@@ -311,6 +311,10 @@ def main():
         os.makedirs(d, exist_ok=True)
         mem = build_sdram(regs)
         open(os.path.join(d, "sdram_le.bin"), "wb").write(mem)
+        be = bytearray(len(mem))                    # 16-bit words big-endian (SDRAM chip model)
+        be[0::2] = mem[1::2]
+        be[1::2] = mem[0::2]
+        open(os.path.join(d, "sdram_be.bin"), "wb").write(be)
         mc = regs["maincpu"]
         write_hex16(os.path.join(d, "maincpu.hex"), [(mc[2 * i] << 8) | mc[2 * i + 1] for i in range(len(mc) // 2)])
         write_hex8(os.path.join(d, "soundcpu.hex"), regs["soundcpu"])

@@ -22,7 +22,8 @@ module sdr_sdram_model #(
     parameter real TRP_NS  = 18.0,
     parameter real TRFC_NS = 60.0,
     parameter real TRAS_NS = 42.0,
-    parameter int  TWR_CK  = 2
+    parameter int  TWR_CK  = 2,
+    parameter bit [15:0] UNWRITTEN = 16'hA5C3   // value of cells never written or preloaded
 ) (
     input  wire        clk,
     input  wire        cke,
@@ -32,8 +33,7 @@ module sdr_sdram_model #(
     input  wire        dqml, dqmh,
     inout  wire [15:0] dq
 );
-    // Unwritten cells read as this value (the bench only checks written data).
-    localparam [15:0] UNWRITTEN = 16'hA5C3;
+    // Unwritten cells read as UNWRITTEN (the bench only checks written data).
 
     bit [15:0] mem [bit [23:0]];
 
@@ -72,8 +72,7 @@ module sdr_sdram_model #(
         if (fd == 0) begin $display("sdr_sdram_model: cannot open %s", file); return; end
         n = 0;
         while ($fread(w, fd) == 2) begin
-            if (w != 16'h0000) mem[n] = w;
-            else mem[n] = 16'h0000;
+            if (w != UNWRITTEN) mem[n] = w;     // cells equal to the default stay implicit
             n++;
         end
         $fclose(fd);
