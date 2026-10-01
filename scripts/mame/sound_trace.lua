@@ -4,6 +4,7 @@
 --   X <t> RESET              machine reset (the watchdog reset at 3 s)
 -- Output $NOST_OUT, duration $NOST_SECONDS (default 20). Optional $NOST_INPUTS as io_trace.lua.
 if _G.nost_sound_trace then return end
+dofile((debug.getinfo(1, "S").source:sub(2):match("(.*[/\\])") or "") .. "bootpatch.lua")
 _G.nost_sound_trace = true
 local m = manager.machine
 local out = io.open(os.getenv("NOST_OUT") or "sound_trace.txt", "w")

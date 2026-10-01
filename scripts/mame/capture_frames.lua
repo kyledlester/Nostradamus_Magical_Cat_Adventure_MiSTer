@@ -15,6 +15,7 @@
 -- screen:pixels() returns the previously completed bitmap, so the pixels of the frame rendered at
 -- frame_done(N) are read at frame_done(N+1) (NOST_PIXDELAY=1, as established for R-Shark).
 if _G.nost_capture then return end      -- MAME re-runs autoboot scripts after a (watchdog) reset
+dofile((debug.getinfo(1, "S").source:sub(2):match("(.*[/\\])") or "") .. "bootpatch.lua")
 _G.nost_capture = true
 local dir = os.getenv("NOST_OUT")
 local want = {}

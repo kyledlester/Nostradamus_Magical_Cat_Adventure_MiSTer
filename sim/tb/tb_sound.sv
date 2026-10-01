@@ -16,6 +16,12 @@
 module tb_sound;
     logic clk = 0;
     always #31.25 clk = ~clk;
+    logic clk_sys = 0;
+`ifdef TWOCLK
+    always #5.099 clk_sys = ~clk_sys;     // experiment: production-like separate clk_sys
+`else
+    always @* clk_sys = clk;
+`endif
     logic reset = 1;
 
     logic [7:0] latch = 8'h00, latch2;
@@ -28,7 +34,7 @@ module tb_sound;
     logic [15:0] c_lat, c_ym, c_nmi, c_zmiss;
 
     nost_sound #(.CE_NUM(1), .CE_DEN(2)) dut (
-        .clk(clk), .clk_snd(clk), .reset(reset), .pause(1'b0),
+        .clk(clk_sys), .clk_snd(clk), .reset(reset), .pause(1'b0),
         .latch(latch), .latch_wr(latch_wr), .latch2(latch2),
         .zrom_req(zrom_req), .zrom_line(zrom_line), .zrom_ack(zrom_ack), .zrom_data(zrom_data),
         .arom_req(arom_req), .arom_line(arom_line), .arom_ack(arom_ack), .arom_data(arom_data),
@@ -92,10 +98,15 @@ module tb_sound;
         // write-by-write comparison is then meaningless, the audio is compared with audiocheck.py)
         if ($value$plusargs("SHIFTFROM=%f", shift_from)) begin
             real nt [$]; int nv [$];
-            foreach (lat_t[i]) if (lat_t[i] >= shift_from) begin nt.push_back(lat_t[i] - shift_from + 200000.0); nv.push_back(lat_v[i]); end
+            real at = 200000.0;
+            void'($value$plusargs("SHIFTAT=%f", at));
+            // +PRE01: the boot handshake command first (the Z80 program answers it and checksums its
+            // ROM banks, ~3 s), as the 68000 does at boot
+            if ($test$plusargs("PRE01")) begin nt.push_back(100000.0); nv.push_back(8'h01); end
+            foreach (lat_t[i]) if (lat_t[i] >= shift_from) begin nt.push_back(lat_t[i] - shift_from + at); nv.push_back(lat_v[i]); end
             lat_t = nt; lat_v = nv;
             w_t.delete(); w_a.delete(); w_d.delete();
-            $display("shifted: %0d latch writes from MAME t=%.0f us replayed from 200 ms", lat_t.size(), shift_from);
+            $display("shifted: %0d latch writes (MAME t >= %.0f us) replayed", lat_t.size(), shift_from);
         end
         if (!$value$plusargs("SOUNDRAW=%s", sraw)) sraw = "build/sim/sound.raw";
         afd = $fopen(sraw, "wb");

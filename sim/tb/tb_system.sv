@@ -17,12 +17,20 @@
 //   +INPUTS=<file> lines "<vblank> <joy0 hex> <joy1 hex>" (MiSTer joystick bits) applied at that vblank
 //   +DSW=<hex>    DIP word as the MRA sends it (index 254), default FFFF
 //   +AUDIO=<file> signed 16-bit mono at 48 kHz
-// Writes build/sim/latch.txt ("frame line value" per 68000 sound-latch write) and prints counters.
+// Writes <FRAMEDIR>/latch.txt ("frame line value" per 68000 sound-latch write) and prints counters.
 `timescale 1ns/1ps
 module tb_system;
     logic clk = 0, clk_snd = 0;
     always #5.099 clk = ~clk;
+`ifdef NOST_SIM_SND16
+    // simulation speed: the sound board on a 16 MHz bench clock with ce_8m every 2nd clock (exact
+    // 8 MHz / 4 MHz enables, 1/3 of the clock edges of the production clk_sys / 2)
+    always #31.25 clk_snd = ~clk_snd;
+    localparam int SND_NUM = 1, SND_DEN = 2;
+`else
     always @(posedge clk) clk_snd <= ~clk_snd;
+    localparam int SND_NUM = 3125, SND_DEN = 19152;
+`endif
     logic init = 1, reset = 1;
 
     logic [26:1] sd_addr; logic [15:0] sd_din; logic [1:0] sd_be; logic sd_req, sd_rnw, sd_ready;
@@ -35,7 +43,7 @@ module tb_system;
     logic [15:0] ioctl_index = 0, ioctl_dout = 0;
     string sdram_img;
 
-    nost_core dut (
+    nost_core #(.SND_CE_NUM(SND_NUM), .SND_CE_DEN(SND_DEN)) dut (
         .clk(clk), .clk_snd(clk_snd), .init(init), .reset(reset), .pause(1'b0),
         .ioctl_download(ioctl_download), .ioctl_index(ioctl_index), .ioctl_wr(ioctl_wr), .ioctl_addr('0),
         .ioctl_dout(ioctl_dout), .ioctl_wait(ioctl_wait),
@@ -191,8 +199,18 @@ module tb_system;
         if ($value$plusargs("AUDIO=%s", audio_file)) afd = $fopen(audio_file, "wb");
         if (!$value$plusargs("SDRAM=%s", sdram_img)) sdram_img = "local/sim/sdram_be.bin";
         chip.preload(sdram_img);
-        lfd = $fopen("build/sim/latch.txt", "w");
+        lfd = $fopen({frame_dir, "/latch.txt"}, "w");
         if ($value$plusargs("SNAP=%s", snap_dir)) restore_snapshot();
+        if ($test$plusargs("BOOTPATCH")) begin
+            // scripts/mame/bootpatch.lua, applied to the SDRAM image (word addresses)
+            chip.mem[24'h0000B1] = 16'h0004;                        // 68000 0x162: cmpa.l #$040000
+            chip.mem[24'h0000B5] = 16'h6000;                        // 68000 0x16A: bra
+            chip.mem[24'h0000BA] = 16'h6000;                        // 68000 0x174: bra
+            chip.mem[24'h000135] = 16'h6000; chip.mem[24'h000136] = 16'h01B6;   // 0x26A: bra $422
+            chip.mem[24'h0802FC] = {8'hC3, chip.mem[24'h0802FC][7:0]};          // Z80 0x5F9: jp $0604
+            chip.mem[24'h0802FD] = 16'h0604;
+            $display("boot patches applied (scripts/mame/bootpatch.lua)");
+        end
         if ($test$plusargs("SKIPWD")) begin
             dut.main.ram.hi[15'h0E] = 8'h6E; dut.main.ram.lo[15'h0E] = 8'h6F;
             dut.main.ram.hi[15'h0F] = 8'h73; dut.main.ram.lo[15'h0F] = 8'h74;

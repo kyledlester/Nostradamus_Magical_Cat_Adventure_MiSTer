@@ -7,6 +7,7 @@
 -- tile RAM, palette and sprite RAM write counts (with first/last line), ROM page coverage
 -- (4 KB pages read: opcode fetches and data) written at the end.
 if _G.nost_io_trace then return end          -- MAME re-runs autoboot scripts after a reset
+dofile((debug.getinfo(1, "S").source:sub(2):match("(.*[/\\])") or "") .. "bootpatch.lua")
 _G.nost_io_trace = true
 local m = manager.machine
 local out = io.open(os.getenv("NOST_OUT") or "io_trace.txt", "w")

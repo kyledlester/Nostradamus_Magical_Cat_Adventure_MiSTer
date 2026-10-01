@@ -9,6 +9,7 @@
 -- tmregs.bin (6 words), vidregs.bin (8 words); all big-endian words.
 -- At the handler's first fetch the exception frame (SR, PC) is already on the stack at SP.
 _G.nost_snap_runs = (_G.nost_snap_runs or 0) + 1
+dofile((debug.getinfo(1, "S").source:sub(2):match("(.*[/\\])") or "") .. "bootpatch.lua")
 if _G.nost_snap_runs > 1 and _G.nost_snap_done then return end
 local m = manager.machine
 local scr = m.screens[":screen"]

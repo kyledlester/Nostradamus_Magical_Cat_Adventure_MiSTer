@@ -8,7 +8,10 @@
 //   nost_loader        -> ROM stream to SDRAM           nost_main  -> 68000 board
 //   nost_video         -> 038 x2 tilemaps, sprites, mixer  nost_sound -> Z80, YM2610
 //   nost_sdram_arb     -> SDRAM channel 1 (loader > 68000 ROM > ADPCM-A > Z80 ROM > tiles > sprites)
-module nost_core (
+module nost_core #(
+    parameter int SND_CE_NUM = 3125,     // sound board ce_8m = SND_CE_NUM / SND_CE_DEN of clk_snd
+    parameter int SND_CE_DEN = 19152
+) (
     input  logic        clk,
     input  logic        clk_snd,        // clk_sys / 2, sound board
     input  logic        init,
@@ -160,7 +163,7 @@ module nost_core (
     assign zrom_line = '0; assign arom_line = '0;
     assign {dbg_lat_rd, dbg_ym, dbg_nmi, dbg_zmiss} = '0;
 `else
-    nost_sound sound (
+    nost_sound #(.CE_NUM(SND_CE_NUM), .CE_DEN(SND_CE_DEN)) sound (
         .clk(clk), .clk_snd(clk_snd), .reset(reset || soft_reset), .pause(pause),
         .latch(latch), .latch_wr(latch_wr), .latch2(latch2),
         .zrom_req(zrom_req), .zrom_line(zrom_line), .zrom_ack(zrom_ack), .zrom_data(mem_rdata),

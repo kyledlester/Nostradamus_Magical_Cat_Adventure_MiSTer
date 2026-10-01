@@ -18,12 +18,15 @@ def main():
     ap.add_argument("mame")
     ap.add_argument("--start", type=float, default=0.2, help="seconds to skip (silent boot)")
     ap.add_argument("--out", default=None)
+    ap.add_argument("--mame-offset", type=float, default=0.0,
+                    help="MAME time (s) that corresponds to FPGA time 0 (tb_sound: 3.0 = the watchdog reset)")
     a = ap.parse_args()
     f = np.frombuffer(open(a.fpga, "rb").read(), dtype="<i2").astype(np.float64)
     t_f = np.arange(len(f)) / 1e6
     w = wave.open(a.mame)
     m = np.frombuffer(w.readframes(w.getnframes()), dtype="<i2").astype(np.float64)
     rate = w.getframerate()
+    m = m[int(a.mame_offset * rate):]
     n = min(len(m), int(t_f[-1] * rate))
     t_m = np.arange(n) / rate
     # low-pass the 1 MHz stream (moving average ~20 samples) then sample at MAME's instants
