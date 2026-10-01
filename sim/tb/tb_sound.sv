@@ -64,6 +64,7 @@ module tb_sound;
     real   lat_t [$]; int lat_v [$];
     real   w_t [$]; int w_a [$]; int w_d [$];
     int    run_ms = 400, max_n = 0;
+    real   shift_from;
     int    afd;
     string strace, sraw;
     initial begin
@@ -86,6 +87,16 @@ module tb_sound;
             end
         end
         $fclose(fd);
+        // +SHIFTFROM=<us>: keep only the latch writes from that MAME time (relative to the reset) on,
+        // moved to start 200 ms after the reset (skips the boot handshake and the idle wait; the
+        // write-by-write comparison is then meaningless, the audio is compared with audiocheck.py)
+        if ($value$plusargs("SHIFTFROM=%f", shift_from)) begin
+            real nt [$]; int nv [$];
+            foreach (lat_t[i]) if (lat_t[i] >= shift_from) begin nt.push_back(lat_t[i] - shift_from + 200000.0); nv.push_back(lat_v[i]); end
+            lat_t = nt; lat_v = nv;
+            w_t.delete(); w_a.delete(); w_d.delete();
+            $display("shifted: %0d latch writes from MAME t=%.0f us replayed from 200 ms", lat_t.size(), shift_from);
+        end
         if (!$value$plusargs("SOUNDRAW=%s", sraw)) sraw = "build/sim/sound.raw";
         afd = $fopen(sraw, "wb");
         $display("trace: reset at %.0f us; %0d latch writes, %0d Z80 writes after it", t0, lat_t.size(), w_t.size());
