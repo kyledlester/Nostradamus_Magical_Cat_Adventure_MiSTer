@@ -43,3 +43,6 @@ Thumbs.db
 /PLLJ_PLLSPE_INFO.txt
 
 *.raw
+
+# RBFs are committed deliberately at release time only (git add -f)
+/Releases/*.rbf
