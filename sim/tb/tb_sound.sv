@@ -46,6 +46,9 @@ module tb_sound;
     initial begin
         $readmemh("local/sim/soundcpu.hex", zrom);
         $readmemh("local/sim/adpcma.hex", arom);
+        if ($test$plusargs("ZPATCH")) begin   // scripts/mame/bootpatch.lua Z80 part: skip ROM checksum
+            zrom[18'h5F9] = 8'hC3; zrom[18'h5FA] = 8'h04; zrom[18'h5FB] = 8'h06;
+        end
     end
     int romlat = 6, zc = 0, ac = 0, alate = 0;
     initial void'($value$plusargs("ROMLAT=%d", romlat));
@@ -157,6 +160,16 @@ module tb_sound;
     always @(posedge clk) if (!reset && dut.ce_8m && !dut.adpcma_roe_n && !dut.amatch) alate++;
 
     always @(posedge clk) if (!reset && clks % 16 == 0) $fwrite(afd, "%c%c", snd[7:0], snd[15:8]);
+    // output activity: peaks and X detection every 100 ms
+    int pk_l = 0, pk_psg = 0, n_xl = 0, n_xs = 0;
+    always @(posedge clk) if (!reset) begin
+        if ($isunknown(dut.fm_l)) n_xl++; else if ($signed(dut.fm_l) > pk_l) pk_l = $signed(dut.fm_l);
+        if ($isunknown(dut.snd_s)) n_xs++;
+        if (!$isunknown(dut.psg_a) && dut.psg_a > pk_psg) pk_psg = dut.psg_a;
+        if (clks % 1600000 == 0)
+            $display("t=%0d ms: ym writes %0d latch reads %0d nmis %0d | fm_l peak %0d (X %0d) psg_a peak %0d snd_s X %0d snd %0d",
+                     clks / 16000, c_ym, c_lat, c_nmi, pk_l, n_xl, pk_psg, n_xs, snd);
+    end
     always @(posedge clk) if (t_us >= run_ms * 1000.0) finish_run();
 
     task automatic finish_run();

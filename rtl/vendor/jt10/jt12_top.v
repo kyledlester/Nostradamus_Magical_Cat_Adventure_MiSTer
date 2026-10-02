@@ -180,7 +180,11 @@ assign debug_view = { 4'd0, flag_B, flag_A, div_setting };
 always @(posedge clk) begin
     cen_reg <= cen;
 end
-
+
+// Nostradamus core: declarations moved above their first use (was line 507-508); simulators
+// otherwise create an implicit 1-bit net at the jt10_acc connection.
+wire    [ 8:0]  op_result;
+wire    [13:0]  op_result_hd;
 generate
 if( use_adpcm==1 ) begin: gen_adpcm
     wire rst_n;
@@ -504,8 +508,6 @@ endgenerate
     assign psg_dout = 8'd0;
 `endif
 
-wire    [ 8:0]  op_result;
-wire    [13:0]  op_result_hd;
 `ifndef NOFM
 
 jt12_pg #(.num_ch(num_ch)) u_pg(

@@ -20,8 +20,11 @@ foreach r [find instances -r $root/*u_reg] {
     catch { force -deposit $p/zero 1'b1 }
     catch { force -deposit $p/last 1'b0 }
 }
-# Any other register still X at time 0 (accumulators that are never reset, e.g. jt10's FM/ADPCM
-# sums): deposit FPGA power-up zeros, bit width preserved.
+# Any other register still X (accumulators that are never reset, e.g. jt10's FM/ADPCM sums):
+# deposit FPGA power-up zeros, bit width preserved. Run a few ns first so that nets driven by
+# constants and continuous assignments have their values (depositing into a constant-driven net
+# would stick, e.g. jt10's ch_enable).
+run 20ns
 set z 0
 foreach s [find signals -r $root/*] {
     if {[catch {set v [examine -radix binary $s]}]} { continue }
