@@ -1,9 +1,9 @@
-// Nostradamus MiSTer core (from the owner's R-Shark core) -- CRT Adjust glue.
+// Nostradamus MiSTer core -- CRT Adjust glue (from the owner's R-Shark core, fixed version ca37da3).
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Copied from the owner's Neratte Chu core (rtl/nrc/nrc_crt_adjust.sv, itself a port of the owner's
-// hardware-confirmed Namco NA-1/NA-2 integration); only the module name and the raster parameters
-// passed by Nostradamus.sv differ. Wraps the UNMODIFIED upstream rtl/vendor/crt_adjust.sv
+// Adapted from the owner's Neratte Chu core (rtl/nrc/nrc_crt_adjust.sv, itself a port of the owner's
+// hardware-confirmed Namco NA-1/NA-2 integration): module name, raster parameters (Nostradamus.sv) and the
+// H-Position limit table, which depends on the raster geometry. Wraps the UNMODIFIED upstream rtl/vendor/crt_adjust.sv
 // (MiSTer-CRT-Adjust, Umberto Parisi / rmonic79, GPL-3.0-or-later).
 //   [96]      CRT Adjust Off / On (0 = Off = default = TRUE bypass: native stream, zero latency)
 //   [116:112] H-Size OSD index -> -12..+10, one step = 1 % (+ = wider)
@@ -54,24 +54,26 @@ module nost_crt_adjust #(
     end
     assign active = crt_on && sd_off;
 
-    // H-Position limit when widening (checked by sim/tb/m17_crt_tb.sv over every H-Size): the
-    // module reads the line buffer from its (shifted) HSync at 1/(1 - h/100) dots per pixel; a left
-    // shift of 6p moves the active start to 86 + 6p dots after it, so the picture ends at
-    // (406 + 6p) / (1 - h/100) and must stay before the next HSync (454). Largest left step count:
-    // floor((454 (1 - h/100) - 406) / 6) = 7,6,5,4,4,3,2,1,1,0 for h = +1..+10; beyond it the picture
-    // stops moving (same policy as the owner's NB-1 glue). Narrowing and right shifts need no limit.
+    // H-Position limits for the Nostradamus raster (456 dots: active 0..319, HSync rises at 344;
+    // checked in simulation over every H-Size at both H-Position extremes, sim/tb/tb_crt.sv). In
+    // HPOS_SYNCSHIFT the module records each line from its shifted HSync (rise at 344 + 6p) to the
+    // next, so the shifted HSync must stay in the horizontal blank (344 + 6p >= 320 -> p >= -4) and
+    // the widened read-out, ending (432 - 6p) / (1 - h/100) dots after it, must end before the next
+    // HSync. Settings beyond the limit are clamped (the picture stops moving), as in the owner's
+    // NB-1 / Neratte Chu / R-Shark glue.
     reg signed [3:0] lmax;
     always_comb begin
         case (hsize_s)
-            5'sd1:  lmax = -4'sd7;
-            5'sd2:  lmax = -4'sd6;
-            5'sd3:  lmax = -4'sd5;
-            5'sd4, 5'sd5: lmax = -4'sd4;
-            5'sd6:  lmax = -4'sd3;
-            5'sd7:  lmax = -4'sd2;
-            5'sd8, 5'sd9: lmax = -4'sd1;
-            5'sd10: lmax = 4'sd0;
-            default: lmax = -4'sd8;
+            5'sd0:  lmax = -4'sd3;
+            5'sd1:  lmax = -4'sd3;
+            5'sd2:  lmax = -4'sd2;
+            5'sd3:  lmax = -4'sd1;
+            5'sd4, 5'sd5: lmax = 4'sd0;
+            5'sd6:  lmax = 4'sd1;
+            5'sd7:  lmax = 4'sd2;
+            5'sd8:  lmax = 4'sd3;
+            5'sd9, 5'sd10: lmax = 4'sd4;
+            default: lmax = -4'sd4;     // narrower pictures
         endcase
     end
     reg signed [3:0] hpos_c = 4'sd0;

@@ -18,7 +18,8 @@ module tb_loader;
     nost_loader loader (
         .clk(clk), .rst(init), .ioctl_download(dl), .ioctl_index(16'd0), .ioctl_wr(wr),
         .ioctl_addr(ad), .ioctl_dout(dout), .ioctl_wait(wt),
-        .mem_req(req), .mem_addr(maddr), .mem_wdata(mdata), .mem_ack(ack), .loaded(loaded));
+        .mem_req(req), .mem_addr(maddr), .mem_wdata(mdata), .mem_ack(ack),
+        .zfix_we(), .zfix_waddr(), .zfix_wdata(), .loaded(loaded));
 
     logic [5:0] aacks;
     logic [26:1] sd_addr; logic [15:0] sd_din; logic [1:0] sd_be; logic sd_req, sd_rnw, sd_ready;

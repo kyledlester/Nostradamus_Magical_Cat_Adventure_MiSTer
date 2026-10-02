@@ -203,12 +203,15 @@ module tb_system;
         if ($value$plusargs("SNAP=%s", snap_dir)) restore_snapshot();
         if ($test$plusargs("BOOTPATCH")) begin
             // scripts/mame/bootpatch.lua, applied to the SDRAM image (word addresses)
-            chip.mem[24'h0000B1] = 16'h0004;                        // 68000 0x162: cmpa.l #$040000
+            chip.mem[24'h0000B1] = $test$plusargs("BOOTPATCH2") ? 16'h0001 : 16'h0004;   // 0x162: cmpa.l #$010000 / #$040000
             chip.mem[24'h0000B5] = 16'h6000;                        // 68000 0x16A: bra
             chip.mem[24'h0000BA] = 16'h6000;                        // 68000 0x174: bra
             chip.mem[24'h000135] = 16'h6000; chip.mem[24'h000136] = 16'h01B6;   // 0x26A: bra $422
             chip.mem[24'h0802FC] = {8'hC3, chip.mem[24'h0802FC][7:0]};          // Z80 0x5F9: jp $0604
             chip.mem[24'h0802FD] = 16'h0604;
+`ifndef NOST_SIM_NO_SOUND
+            dut.sound.zfix_hi.mem[14'h2FC] = 8'hC3; dut.sound.zfix_lo.mem[14'h2FD] = 8'h04; dut.sound.zfix_hi.mem[14'h2FD] = 8'h06;
+`endif
             $display("boot patches applied (scripts/mame/bootpatch.lua)");
         end
         if ($test$plusargs("SKIPWD")) begin

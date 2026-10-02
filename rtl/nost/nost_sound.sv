@@ -28,6 +28,11 @@ module nost_sound #(
     input  logic        latch_wr,       // one clk_sys pulse per 68000 write
     output logic  [7:0] latch2,         // Z80 -> 68000 (clk_sys domain)
 
+    // Z80 ROM 0000-7FFF copy in block RAM, written by the loader (clk_sys): word k = bytes 2k, 2k+1
+    input  logic        zfix_we,
+    input  logic [14:1] zfix_waddr,
+    input  logic [15:0] zfix_wdata,      // {byte 2k+1, byte 2k}
+
     // Z80 ROM line fill (SDRAM, 8 bytes, byte k = bits 8k+7..8k)
     output logic        zrom_req,
     output logic [17:3] zrom_line,
@@ -115,7 +120,8 @@ module nost_sound #(
 
     wire mem     = !mreq_n && rfsh_n;
     wire io      = !iorq_n && m1_n;
-    wire sel_rom = mem && !A[15] || mem && A[15:14] == 2'b10;
+    wire sel_fix = mem && !A[15];                     // 0000-7FFF: block RAM, no wait states
+    wire sel_rom = mem && A[15:14] == 2'b10;          // 8000-BFFF bank window: SDRAM cache
     wire sel_ram = mem && A[15:13] == 3'b110;
     wire sel_ymw = io && A[7:2] == 6'b000000;       // 00-03
     wire sel_ymr = io && A[7:2] == 6'b000001;       // 04-07
@@ -139,8 +145,28 @@ module nost_sound #(
         .clk(clk_snd), .a_addr(A[12:0]), .a_we(sel_ram && wr_edge), .a_din(cpu_do), .a_dout(ram_q),
         .b_addr(13'd0), .b_dout());
 
-    // ------------------------------------------------------------------ Z80 ROM cache
-    // direct-mapped, 512 lines of 8 bytes; ROM address = A (0000-7FFF) or bank * 0x4000 + A[13:0]
+    // ------------------------------------------------------------------ Z80 ROM 0000-7FFF
+    // The program code lives here; in block RAM it runs without wait states, like the board's ROM.
+    logic [7:0] fix_lo_q, fix_hi_q;
+    nost_dcram #(.AW(14), .DW(8)
+`ifdef NOST_SIM_ZFIX
+        , .INIT("local/sim/zfix_lo.hex")
+`endif
+    ) zfix_lo (.wclk(clk), .w_addr(zfix_waddr), .we(zfix_we), .din(zfix_wdata[7:0]),
+               .rclk(clk_snd), .r_addr(A[14:1]), .dout(fix_lo_q));
+    nost_dcram #(.AW(14), .DW(8)
+`ifdef NOST_SIM_ZFIX
+        , .INIT("local/sim/zfix_hi.hex")
+`endif
+    ) zfix_hi (.wclk(clk), .w_addr(zfix_waddr), .we(zfix_we), .din(zfix_wdata[15:8]),
+               .rclk(clk_snd), .r_addr(A[14:1]), .dout(fix_hi_q));
+    wire [7:0] fix_q = A[0] ? fix_hi_q : fix_lo_q;
+
+    // ------------------------------------------------------------------ Z80 ROM cache (bank window)
+    // direct-mapped, 512 lines of 8 bytes; ROM address = A (0000-7FFF) or bank * 0x4000 + A[13:0].
+    // Next-line prefetch: while the Z80 reads a line that hits, the following line is fetched if it
+    // is not present, so sequential code and data (e.g. the boot-time ROM checksum) do not stall the
+    // Z80 (the board's ROM has no wait states; MAME neither).
     wire [17:0] zaddr = A[15] ? {bank, A[13:0]} : {3'b000, A[14:0]};
     logic [2:0]  zrq_s;
     logic        zack;
@@ -155,11 +181,18 @@ module nost_sound #(
     logic [63:0] zfill_data;
     logic [17:3] zfill_line;
     logic [1:0]  zsettle;
+    logic [11:3] zsettle_idx;
     logic        zfill_rq;
+    logic [7:0]  ptag_q;
+    wire  [17:0] znext = zaddr + 18'd8;
     nost_sdpram #(.AW(9), .DW(8)) ztags (
         .clk(clk_snd), .w_addr(zclearing ? zclr : zfill_line[11:3]), .we(zfill_done || zclearing),
         .din(zclearing ? 8'h00 : {1'b1, zfill_line[17:12], 1'b0}),
         .r_addr(zaddr[11:3]), .dout(ztag_q));
+    nost_sdpram #(.AW(9), .DW(8)) ptags (             // tag copy, looked up for the next line
+        .clk(clk_snd), .w_addr(zclearing ? zclr : zfill_line[11:3]), .we(zfill_done || zclearing),
+        .din(zclearing ? 8'h00 : {1'b1, zfill_line[17:12], 1'b0}),
+        .r_addr(znext[11:3]), .dout(ptag_q));
     nost_sdpram #(.AW(9), .DW(64)) zdata (
         .clk(clk_snd), .w_addr(zfill_line[11:3]), .we(zfill_done), .din(zfill_data),
         .r_addr(zaddr[11:3]), .dout(zline_q));
@@ -167,7 +200,9 @@ module nost_sound #(
     always_ff @(posedge clk_snd) begin zaddr_d1 <= zaddr; zaddr_d2 <= zaddr_d1; end
     wire zstable = zaddr == zaddr_d1 && zaddr_d1 == zaddr_d2;
     wire zmatch = ztag_q[7] && ztag_q[6:1] == zaddr[17:12];
-    wire zhit   = zstable && zmatch && zsettle == 0 && !zfill && !zclearing;
+    wire pmatch = ptag_q[7] && ptag_q[6:1] == znext[17:12];
+    wire zbusy_line = (zfill && zfill_line[11:3] == zaddr[11:3]) || (zsettle != 0 && zsettle_idx == zaddr[11:3]);
+    wire zhit   = zstable && zmatch && !zbusy_line && !zclearing;
     wire [7:0] rom_q = zline_q[zaddr[2:0]*8 +: 8];
     assign wait_n = !(sel_rom && !rd_n && !zhit);
 
@@ -191,14 +226,21 @@ module nost_sound #(
                     zfill_data <= zfill_buf;
                     zfill_done <= 1'b1;
                 end else if (!zfill_rq && !zack_s[2]) begin  // handshake closed
-                    zfill   <= 1'b0;
-                    zsettle <= 2'd2;
+                    zfill       <= 1'b0;
+                    zsettle     <= 2'd2;
+                    zsettle_idx <= zfill_line[11:3];
                 end
-            end else if (sel_rom && !rd_n && zstable && !zmatch && zsettle == 0) begin
-                zfill      <= 1'b1;
-                zfill_rq   <= 1'b1;
-                zfill_line <= zaddr[17:3];
-                dbg_zmisses <= dbg_zmisses + 16'd1;
+            end else if (zsettle == 0 && sel_rom && !rd_n && zstable) begin
+                if (!zmatch) begin                           // demand miss: the Z80 waits
+                    zfill      <= 1'b1;
+                    zfill_rq   <= 1'b1;
+                    zfill_line <= zaddr[17:3];
+                    dbg_zmisses <= dbg_zmisses + 16'd1;
+                end else if (!pmatch) begin                  // prefetch the next line
+                    zfill      <= 1'b1;
+                    zfill_rq   <= 1'b1;
+                    zfill_line <= znext[17:3];
+                end
             end
         end
     end
@@ -296,7 +338,8 @@ module nost_sound #(
     // ------------------------------------------------------------------ CPU read mux
     always_comb begin
         cpu_di = 8'h00;                                 // MAME unmapped read value
-        if (sel_rom)      cpu_di = rom_q;
+        if (sel_fix)      cpu_di = fix_q;
+        else if (sel_rom) cpu_di = rom_q;
         else if (sel_ram) cpu_di = ram_q;
         else if (sel_ymr) cpu_di = ym_dout;
         else if (sel_lat) cpu_di = latch_s;

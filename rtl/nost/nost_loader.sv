@@ -4,7 +4,8 @@
 // Stream layout and SDRAM image: docs/ROM_LAYOUT.md (scripts/romtool.py is the executable form;
 // its SDRAM image is what this module writes, word for word). Every stream word goes to SDRAM:
 //   000000-0FFFFF maincpu  -> 0x0000000 + a   (68000 words as delivered)
-//   100000-13FFFF soundcpu -> 0x0100000 + a'  ({byte 2k+1, byte 2k})
+//   100000-13FFFF soundcpu -> 0x0100000 + a'  ({byte 2k+1, byte 2k}); 100000-107FFF also to the
+//                            Z80's block-RAM copy of 0000-7FFF (nost_sound)
 //   140000-23FFFF adpcma   -> 0x0200000 + a'
 //   240000-3BFFFF bg0      -> 0x0400000 + row reorder (romtool gfx_row_perm)
 //   3C0000-53FFFF bg1      -> 0x0600000 + row reorder
@@ -25,6 +26,10 @@ module nost_loader (
     output logic [25:1] mem_addr,
     output logic [15:0] mem_wdata,
     input  logic        mem_ack,
+
+    output logic        zfix_we,         // Z80 ROM 0000-7FFF copy (block RAM in nost_sound)
+    output logic [14:1] zfix_waddr,
+    output logic [15:0] zfix_wdata,
 
     output logic        loaded           // a complete stream has been received
 );
@@ -47,6 +52,7 @@ module nost_loader (
     assign ioctl_wait = st != IDLE;
 
     always_ff @(posedge clk) begin
+        zfix_we <= 1'b0;
         if (rst) begin
             st <= IDLE;
             mem_req <= 1'b0;
@@ -66,6 +72,11 @@ module nost_loader (
                 else if (a < 27'h3C0000) b = 26'h0400000 + {5'd0, perm(21'(a - 27'h240000))};
                 else if (a < 27'h540000) b = 26'h0600000 + {5'd0, perm(21'(a - 27'h3C0000))};
                 else                     b = 26'h0800000 + 26'(a - 27'h540000);
+                if (a >= 27'h100000 && a < 27'h108000) begin
+                    zfix_we    <= 1'b1;
+                    zfix_waddr <= a[14:1];
+                    zfix_wdata <= d;
+                end
                 if (a < 27'hA40000) begin
                     mem_addr  <= b[25:1];
                     mem_wdata <= d;

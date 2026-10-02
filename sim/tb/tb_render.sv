@@ -52,6 +52,8 @@ module tb_render;
 
     // ------------------------------------------------------------------ DUT
     logic [47:0] tm0r, tm1r;
+    logic flip180 = 0;
+    initial if ($test$plusargs("FLIP180")) flip180 = 1;   // MAME pixels rotated 180 degrees are the reference
     logic [15:0] gx, gy;
     logic tm_req, sp_req, tm_ack, sp_ack;
     logic [25:1] tm_addr, sp_addr;
@@ -61,7 +63,7 @@ module tb_render;
     logic [15:0] overruns, maxbusy;
     nost_video video (
         .clk(clk), .rst(rst), .ce_pix(ce_pix), .hcount(hc), .vcount(vc), .line_start(ls),
-        .hblank_in(hb), .vblank_in(vb), .hsync_in(hs), .vsync_in(vs),
+        .hblank_in(hb), .vblank_in(vb), .hsync_in(hs), .vsync_in(vs), .flip180(flip180),
         .tm0_regs(tm0r), .tm1_regs(tm1r), .spr_gx(gx), .spr_gy(gy),
         .vram_addr(vram_addr), .vram0_q(vram0_q), .vram1_q(vram1_q),
         .sbuf_addr(sbuf_addr), .sbuf_q(sbuf_q), .pal_addr(pal_addr), .pal_q(pal_q),
@@ -143,6 +145,7 @@ module tb_render;
             fpga_px[o * 3 + 0] = rgb[23:16];
             fpga_px[o * 3 + 1] = rgb[15:8];
             fpga_px[o * 3 + 2] = rgb[7:0];
+            if (flip180) o = ((223 - y) * 320 + (319 - x));
             if (rgb != {mame_px[o * 4 + 2], mame_px[o * 4 + 1], mame_px[o * 4 + 0]}) begin
                 if (errors < 5) $display("pixel x=%0d y=%0d FPGA %06x MAME %02x%02x%02x", x, y, rgb,
                     mame_px[o * 4 + 2], mame_px[o * 4 + 1], mame_px[o * 4 + 0]);

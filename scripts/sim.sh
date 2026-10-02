@@ -32,16 +32,17 @@ spec() {
   case "$1" in
     boot)  echo "tb_boot||cpu|+define+NOST_SIM_ROM|$CLK $MAIN sim/tb/tb_boot.sv" ;;
     bootc) echo "tb_boot||cpu||$CLK $MAIN sim/tb/tb_boot.sv" ;;
-    sound) echo "tb_sound|$T80|||rtl/nost/nost_ram.sv $SOUND $JT10 sim/tb/tb_sound.sv" ;;
+    sound) echo "tb_sound|$T80||+define+NOST_SIM_ZFIX|rtl/nost/nost_ram.sv $SOUND $JT10 sim/tb/tb_sound.sv" ;;
     loader) python scripts/mk_sdram_sim.py build/sim/sdram_sim.sv
          echo "tb_loader||||rtl/nost/nost_loader.sv rtl/nost/nost_sdram_arb.sv build/sim/sdram_sim.sv sim/models/sdr_sdram_model.sv sim/tb/tb_loader.sv" ;;
     system) python scripts/mk_sdram_sim.py build/sim/sdram_sim.sv; mkdir -p build/sim/frames
-         echo "tb_system|$T80|cpu||$CLK $MAIN $VIDEO $SOUND rtl/nost/nost_loader.sv rtl/nost/nost_sdram_arb.sv rtl/nost/nost_overlay.sv rtl/nost/nost_core.sv $JT10 build/sim/sdram_sim.sv sim/models/sdr_sdram_model.sv sim/tb/tb_system.sv" ;;
+         echo "tb_system|$T80|cpu|+define+NOST_SIM_ZFIX|$CLK $MAIN $VIDEO $SOUND rtl/nost/nost_loader.sv rtl/nost/nost_sdram_arb.sv rtl/nost/nost_overlay.sv rtl/nost/nost_core.sv $JT10 build/sim/sdram_sim.sv sim/models/sdr_sdram_model.sv sim/tb/tb_system.sv" ;;
     systemf) python scripts/mk_sdram_sim.py build/sim/sdram_sim.sv; mkdir -p build/sim/frames
-         echo "tb_system|$T80|cpu|+define+NOST_SIM_SND16|$CLK $MAIN $VIDEO $SOUND rtl/nost/nost_loader.sv rtl/nost/nost_sdram_arb.sv rtl/nost/nost_overlay.sv rtl/nost/nost_core.sv $JT10 build/sim/sdram_sim.sv sim/models/sdr_sdram_model.sv sim/tb/tb_system.sv" ;;
+         echo "tb_system|$T80|cpu|+define+NOST_SIM_SND16 +define+NOST_SIM_ZFIX|$CLK $MAIN $VIDEO $SOUND rtl/nost/nost_loader.sv rtl/nost/nost_sdram_arb.sv rtl/nost/nost_overlay.sv rtl/nost/nost_core.sv $JT10 build/sim/sdram_sim.sv sim/models/sdr_sdram_model.sv sim/tb/tb_system.sv" ;;
     systemns) python scripts/mk_sdram_sim.py build/sim/sdram_sim.sv; mkdir -p build/sim/frames
          echo "tb_system||cpu|+define+NOST_SIM_NO_SOUND|$CLK $MAIN $VIDEO rtl/nost/nost_loader.sv rtl/nost/nost_sdram_arb.sv rtl/nost/nost_overlay.sv rtl/nost/nost_core.sv build/sim/sdram_sim.sv sim/models/sdr_sdram_model.sv sim/tb/tb_system.sv" ;;
     inputs) echo "tb_inputs||cpu|+define+NOST_SIM_NO_SOUND|$CLK $MAIN $VIDEO rtl/nost/nost_loader.sv rtl/nost/nost_sdram_arb.sv rtl/nost/nost_overlay.sv rtl/nost/nost_core.sv sim/tb/tb_inputs.sv" ;;
+    crt) echo "tb_crt||||$CLK rtl/vendor/crt_adjust.sv rtl/nost/nost_crt_adjust.sv sim/tb/tb_crt.sv" ;;
     render) python scripts/mk_sdram_sim.py build/sim/sdram_sim.sv
          echo "tb_render||||$CLK rtl/nost/nost_ram.sv $VIDEO rtl/nost/nost_sdram_arb.sv build/sim/sdram_sim.sv sim/models/sdr_sdram_model.sv sim/tb/tb_render.sv" ;;
     *) echo "" ;;

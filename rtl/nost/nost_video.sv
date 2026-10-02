@@ -21,6 +21,7 @@ module nost_video (
     input  logic         vblank_in,
     input  logic         hsync_in,
     input  logic         vsync_in,
+    input  logic         flip180,           // OSD "Flip screen": whole picture rotated 180 degrees
 
     input  logic  [47:0] tm0_regs,
     input  logic  [47:0] tm1_regs,
@@ -58,6 +59,8 @@ module nost_video (
     wire  [7:0] next_line = vcount + 8'd1;  // vcount is already the new line at line_start
     logic       render_start, render_pend, abort;
     logic [7:0] render_y;
+    logic       render_half;          // line-buffer half = parity of the DISPLAY line
+    logic       flip_f = 1'b0;        // flip180, changed only between frames
     logic       tm_busy, sp_busy;
     logic [15:0] busy_cnt;
 
@@ -66,6 +69,7 @@ module nost_video (
         abort        <= 1'b0;
         render_pend  <= 1'b0;
         if (rst) begin
+            flip_f       <= flip180;
             dbg_overruns <= '0;
             dbg_max_busy <= '0;
             busy_cnt     <= '0;
@@ -81,12 +85,15 @@ module nost_video (
                     abort <= 1'b1;
                 end
                 render_pend <= 1'b1;
-                render_y    <= next_line;
+                // flip: display line y shows rendered line 223 - y (and x mirrored at read-out)
+                render_y    <= flip_f ? 8'd223 - next_line : next_line;
+                render_half <= next_line[0];
             end
             render_start <= render_pend;
+            if (line_start && vcount == 8'd224) flip_f <= flip180;
         end
     end
-    wire wr_half = render_y[0];
+    wire wr_half = render_half;
     wire rd_half = vcount[0];
 
     // ------------------------------------------------------------------ engines
@@ -149,7 +156,7 @@ module nost_video (
     always_ff @(posedge clk) begin
         clr <= 1'b0;
         if (ce_pix) begin
-            rd_x   <= hcount;
+            rd_x   <= (flip_f && hcount < 9'd320) ? 9'd319 - hcount : hcount;
             en_r   <= en[rd_half];
             ph     <= 4'd1;
             vis_d1 <= !hblank_in && !vblank_in;

@@ -36,6 +36,7 @@ module tb_sound;
     nost_sound #(.CE_NUM(1), .CE_DEN(2)) dut (
         .clk(clk_sys), .clk_snd(clk), .reset(reset), .pause(1'b0),
         .latch(latch), .latch_wr(latch_wr), .latch2(latch2),
+        .zfix_we(1'b0), .zfix_waddr('0), .zfix_wdata('0),
         .zrom_req(zrom_req), .zrom_line(zrom_line), .zrom_ack(zrom_ack), .zrom_data(zrom_data),
         .arom_req(arom_req), .arom_line(arom_line), .arom_ack(arom_ack), .arom_data(arom_data),
         .snd(snd), .dbg_latch_reads(c_lat), .dbg_ym_writes(c_ym), .dbg_nmis(c_nmi), .dbg_zmisses(c_zmiss));
@@ -48,6 +49,7 @@ module tb_sound;
         $readmemh("local/sim/adpcma.hex", arom);
         if ($test$plusargs("ZPATCH")) begin   // scripts/mame/bootpatch.lua Z80 part: skip ROM checksum
             zrom[18'h5F9] = 8'hC3; zrom[18'h5FA] = 8'h04; zrom[18'h5FB] = 8'h06;
+            dut.zfix_hi.mem[14'h2FC] = 8'hC3; dut.zfix_lo.mem[14'h2FD] = 8'h04; dut.zfix_hi.mem[14'h2FD] = 8'h06;
         end
     end
     int romlat = 6, zc = 0, ac = 0, alate = 0;

@@ -61,6 +61,7 @@ localparam CONF_STR = {
 	"O[122:121],Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"O[1],Orientation,Vert,Horz;",
 	"O[3],Rotate CCW/CW,CCW,CW;",
+	"O[5],Flip screen (180),Off,On;",
 	"O[12:11],Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
 	"-;",
 	"DIP;",
@@ -74,8 +75,9 @@ localparam CONF_STR = {
 	"P2O[13],Pause when OSD is open,Off,On;",
 	"P2O[14],Dim video after 10s,On,Off;",
 	"-;",
-	"O[2],Debug overlay,Off,On;",
-	"O[4],Video test pattern,Off,On;",
+	"P3,Debug;",
+	"P3O[2],Debug overlay,Off,On;",
+	"P3O[4],Video test pattern,Off,On;",
 	"-;",
 	"T[0],Reset;",
 	"R[0],Reset and close OSD;",
@@ -155,7 +157,7 @@ wire [63:0] sd_dout;
 
 wire        ce_pix;
 wire [23:0] rgb;
-wire        hblank, vblank, hsync, vsync;
+wire        hblank, vblank, hsync, vsync, vb_next;
 wire signed [15:0] snd;
 
 nost_core core
@@ -182,12 +184,14 @@ nost_core core
 	.joy1(joystick_1),
 	.test_pattern(status[4]),
 	.dbg_overlay(status[2]),
+	.flip180(status[5]),
 	.ce_pix(ce_pix),
 	.rgb(rgb),
 	.hblank(hblank),
 	.vblank(vblank),
 	.hsync(hsync),
 	.vsync(vsync),
+	.vb_next(vb_next),
 	.snd(snd)
 );
 
@@ -272,7 +276,7 @@ nost_crt_adjust #(.SYS_HZ(98_058_240), .PIX_DIV(14), .HTOTAL(456), .VTOTAL(256))
 	.vblank_in(vblank),
 	.hsync_in(hsync),
 	.vsync_in(vsync),
-	.vb_next_in(1'b0),
+	.vb_next_in(vb_next),
 	.ce_out(av_ce),
 	.rgb_out(av_rgb),
 	.hblank_out(av_hb),

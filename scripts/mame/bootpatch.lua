@@ -9,7 +9,8 @@
 if os.getenv("NOST_BOOTPATCH") then
   local mc = manager.machine.memory.regions[":maincpu"]
   local zc = manager.machine.memory.regions[":soundcpu"]
-  mc:write_u8(0x163, 0x04)
+  -- NOST_BOOTPATCH=2: checksum over 64 KB (~0.13 s; still after the Z80's ~42 ms start-up)
+  mc:write_u8(0x163, os.getenv("NOST_BOOTPATCH") == "2" and 0x01 or 0x04)
   mc:write_u8(0x16a, 0x60); mc:write_u8(0x174, 0x60)
   mc:write_u8(0x26a, 0x60); mc:write_u8(0x26b, 0x00); mc:write_u8(0x26c, 0x01); mc:write_u8(0x26d, 0xb6)
   zc:write_u8(0x5f9, 0xc3); zc:write_u8(0x5fa, 0x04); zc:write_u8(0x5fb, 0x06)

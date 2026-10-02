@@ -37,6 +37,7 @@ module nost_core #(
     input  logic [31:0] joy1,
     input  logic        test_pattern,
     input  logic        dbg_overlay,
+    input  logic        flip180,        // OSD Flip screen (180 degrees, independent of the game)
 
     output logic        ce_pix,
     output logic [23:0] rgb,
@@ -44,6 +45,7 @@ module nost_core #(
     output logic        vblank,
     output logic        hsync,
     output logic        vsync,
+    output logic        vb_next,        // vertical blank of the line after the current output line
     output logic signed [15:0] snd
 );
     // ------------------------------------------------------------------ clocks / raster
@@ -90,11 +92,15 @@ module nost_core #(
     logic [25:1] ld_addr;
     logic [15:0] ld_wdata;
     logic        loaded;
+    logic        zfix_we;
+    logic [14:1] zfix_waddr;
+    logic [15:0] zfix_wdata;
     nost_loader loader (
         .clk(clk), .rst(init),
         .ioctl_download(ioctl_download), .ioctl_index(ioctl_index), .ioctl_wr(ioctl_wr),
         .ioctl_addr(ioctl_addr), .ioctl_dout(ioctl_dout), .ioctl_wait(ioctl_wait),
         .mem_req(ld_req), .mem_addr(ld_addr), .mem_wdata(ld_wdata), .mem_ack(ld_ack),
+        .zfix_we(zfix_we), .zfix_waddr(zfix_waddr), .zfix_wdata(zfix_wdata),
         .loaded(loaded));
 
     // ------------------------------------------------------------------ 68000 board
@@ -133,7 +139,7 @@ module nost_core #(
     logic [15:0] dbg_overruns, dbg_maxbusy;
     nost_video video (
         .clk(clk), .rst(reset), .ce_pix(ce_pix), .hcount(hcount), .vcount(vcount), .line_start(line_start),
-        .hblank_in(hb), .vblank_in(vb), .hsync_in(hs), .vsync_in(vs),
+        .hblank_in(hb), .vblank_in(vb), .hsync_in(hs), .vsync_in(vs), .flip180(flip180),
         .tm0_regs(tm0_regs), .tm1_regs(tm1_regs), .spr_gx(spr_gx), .spr_gy(spr_gy),
         .vram_addr(vram_addr), .vram0_q(vram0_q), .vram1_q(vram1_q),
         .sbuf_addr(sbuf_addr), .sbuf_q(sbuf_q), .pal_addr(pal_addr), .pal_q(pal_q),
@@ -166,6 +172,7 @@ module nost_core #(
     nost_sound #(.CE_NUM(SND_CE_NUM), .CE_DEN(SND_CE_DEN)) sound (
         .clk(clk), .clk_snd(clk_snd), .reset(reset || soft_reset), .pause(pause),
         .latch(latch), .latch_wr(latch_wr), .latch2(latch2),
+        .zfix_we(zfix_we), .zfix_waddr(zfix_waddr), .zfix_wdata(zfix_wdata),
         .zrom_req(zrom_req), .zrom_line(zrom_line), .zrom_ack(zrom_ack), .zrom_data(mem_rdata),
         .arom_req(arom_req), .arom_line(arom_line), .arom_ack(arom_ack), .arom_data(mem_rdata),
         .snd(snd),
@@ -216,5 +223,8 @@ module nost_core #(
         end else
             rgb <= ovl_rgb;
         {hblank, vblank, hsync, vsync} <= {vhb, vvb, vhs, vvs};
+        // for CRT Adjust: the output stream lags the raster counters by a few dots, so vcount is
+        // still the output line when its active area ends (where nost_crt_adjust samples this)
+        vb_next <= (vcount + 8'd1) >= 8'd224;
     end
 endmodule

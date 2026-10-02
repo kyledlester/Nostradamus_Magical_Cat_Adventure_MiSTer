@@ -319,6 +319,9 @@ def main():
         write_hex16(os.path.join(d, "maincpu.hex"), [(mc[2 * i] << 8) | mc[2 * i + 1] for i in range(len(mc) // 2)])
         write_hex8(os.path.join(d, "soundcpu.hex"), regs["soundcpu"])
         write_hex8(os.path.join(d, "adpcma.hex"), regs["adpcma"])
+        z = regs["soundcpu"][:0x8000]                 # nost_sound block-RAM copy of 0000-7FFF
+        write_hex8(os.path.join(d, "zfix_lo.hex"), z[0::2])
+        write_hex8(os.path.join(d, "zfix_hi.hex"), z[1::2])
         print("simulation images written to", d)
     elif a.cmd == "mracheck":
         got = interpret_mra(mra, data)
