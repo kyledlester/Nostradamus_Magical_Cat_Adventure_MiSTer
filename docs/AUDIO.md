@@ -53,3 +53,13 @@ The FM/ADPCM balance inside jt10 follows the chip (jt10's own accumulator); MAME
 the watchdog reset on; every Z80 I/O write (YM2610, bank, latch 2) compared in order with MAME's.
 `scripts/audiocheck.py` compares the bench's audio with `mame -wavwrite` (RMS ratio, 10 ms envelope
 and log-spectrum correlation).
+
+Results so far:
+
+| Check | Result |
+| --- | --- |
+| `sim.sh sound +MS=60` (from the watchdog reset) | 109/109 Z80 I/O writes identical to MAME in order |
+| `sim.sh sound +ZPATCH +PRE01 +SHIFTFROM=13373328 +SHIFTAT=400000` (handshake 0x01, then MAME's latch writes from the attract-music command 0x05 on, moved to 0.4 s) + `audiocheck.py --mame-offset 15.9733 --start 0.45` | attract music 0.45-2.35 s: RMS ratio 0.97, 10 ms envelope correlation 0.972, log-spectrum correlation 0.995 |
+
+Simulation notes: ModelSim needs FPGA power-up zeros for jt10 (`sim/tb/zero_regs.do`); without
+them the never-reset accumulators stay X and the output is silent in simulation only.
