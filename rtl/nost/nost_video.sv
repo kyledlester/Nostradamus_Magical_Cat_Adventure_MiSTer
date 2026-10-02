@@ -23,6 +23,7 @@ module nost_video (
     input  logic         vsync_in,
     input  logic         flip180,           // OSD "Flip screen": whole picture rotated 180 degrees
     input  logic         cave038,           // OSD "Tilemap engine": 0 = nost_tilemap, 1 = Cave 038
+    input  logic         mcat,              // game select (tile ROM sizes)
 
     input  logic  [47:0] tm0_regs,
     input  logic  [47:0] tm1_regs,
@@ -117,14 +118,14 @@ module nost_video (
     logic [25:1] c_addr;
     nost_tilemap tilemap (
         .clk(clk), .rst(rst || abort), .start(render_start && !cave_f), .y(render_y), .busy(n_busy),
-        .regs0(tm0_regs), .regs1(tm1_regs),
+        .regs0(tm0_regs), .regs1(tm1_regs), .mcat(mcat),
         .vram_addr(n_vaddr), .vram0_q(vram0_q), .vram1_q(vram1_q),
         .mem_req(n_req), .mem_addr(n_addr), .mem_ack(tm_ack && !cave_f), .mem_data(mem_data),
         .lb_we(n_we), .lb_layer(n_layer), .lb_x(n_x), .lb_data(n_data),
         .en_we(n_enwe), .en_data(n_en));
     nost_tilemap_cave tilemap_cave (
         .clk(clk), .rst(rst || abort), .start(render_start && cave_f), .y(render_y), .busy(c_busy),
-        .regs0(tm0_regs), .regs1(tm1_regs),
+        .regs0(tm0_regs), .regs1(tm1_regs), .mcat(mcat),
         .vram_addr(c_vaddr), .vram0_q(vram0_q), .vram1_q(vram1_q),
         .mem_req(c_req), .mem_addr(c_addr), .mem_ack(tm_ack && cave_f), .mem_data(mem_data),
         .lb_we(c_we), .lb_layer(c_layer), .lb_x(c_x), .lb_data(c_data),

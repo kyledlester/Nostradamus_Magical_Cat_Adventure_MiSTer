@@ -1,6 +1,8 @@
--- MAME 0.289 Lua: nost sound traffic with timestamps (microseconds since machine start).
+-- MAME 0.289 Lua: nost / mcatadv sound traffic with timestamps (microseconds since machine start).
 --   M <t> <value>            68000 sound-latch write (0xC00000 low byte)
---   Z <t> R|W <port> <value> Z80 I/O access (YM2610 00-07, bank 40, latches 80)
+--   Z <t> R|W <port> <value> Z80 I/O access (nost: YM2610 00-07, bank 40, latches 80; mcatadv: 80)
+--   Z <t> R|W <addr> <value> mcatadv only: Z80 memory access to the YM2610 (E000-E003, 4 hex
+--                            digits) and the bank register (F000)
 --   X <t> RESET              machine reset (the watchdog reset at 3 s)
 -- Output $NOST_OUT, duration $NOST_SECONDS (default 20). Optional $NOST_INPUTS as io_trace.lua.
 if _G.nost_sound_trace then return end
@@ -23,6 +25,15 @@ t2 = zio:install_read_tap(0x00, 0xff, "zr", function(o, d, mk)
   out:write(string.format("Z %.3f R %02x %02x\n", t(), o & 0xff, d & 0xff)) end)
 t3 = zio:install_write_tap(0x00, 0xff, "zw", function(o, d, mk)
   out:write(string.format("Z %.3f W %02x %02x\n", t(), o & 0xff, d & 0xff)) end)
+if m.system.name:match("^mcatadv") or m.system.name == "catt" then
+  local zmem = m.devices[":soundcpu"].spaces["program"]
+  t4 = zmem:install_read_tap(0xe000, 0xe003, "zmr", function(o, d, mk)
+    out:write(string.format("Z %.3f R %04x %02x\n", t(), o, d & 0xff)) end)
+  t5 = zmem:install_write_tap(0xe000, 0xe003, "zmw", function(o, d, mk)
+    out:write(string.format("Z %.3f W %04x %02x\n", t(), o, d & 0xff)) end)
+  t6 = zmem:install_write_tap(0xf000, 0xf000, "zbw", function(o, d, mk)
+    out:write(string.format("Z %.3f W %04x %02x\n", t(), o, d & 0xff)) end)
+end
 rs = emu.add_machine_reset_notifier(function() out:write(string.format("X %.3f RESET\n", t())) end)
 emu.register_frame_done(function()
   local fn = scr:frame_number()

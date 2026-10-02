@@ -1,4 +1,4 @@
-// Nostradamus MiSTer core -- 038 tilemap line renderer (both chips, one engine).
+// LINDA board MiSTer core -- 038 tilemap line renderer (both chips, one engine).
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Hardware form of MAME 0.289 tmap038 (16x16 tile RAM only, as mapped for nost) +
@@ -10,7 +10,7 @@
 //   reg0/reg1 bit 15 = 0 (flip X / Y): scrollx -= 19 / scrolly -= 141, and the source pixel is
 //     sx = (319 + scrollx - x) & 511 / sy = (223 + scrolly - y) & 511 instead of x + scrollx / y + scrolly
 //   tile (sy >> 4) * 32 + (sx >> 4): word0 = {cat[1:0], colour[5:0], -}, word1 = code;
-//   8x8 code = code * 4 + quadrant, modulo the region's 0xC000 elements = (code % 0x3000) * 4 + q
+//   8x8 code = code * 4 + quadrant, modulo the region's elements (code_wrap below)
 //   palette index = ((colour + bank * 0x40) % 0x200) * 16 + pen, kept to 12 bits (4096 entries)
 //   reg2 bit 4 = layer disable, reg2 bits 3-0 = colour bank (mcatadv get_banked_color).
 // Output per layer and x (0..319): {opaque, cat[1:0], index[11:0]} into a line buffer, plus a
@@ -27,6 +27,7 @@ module nost_tilemap (
 
     input  logic [47:0] regs0,          // {reg2, reg1, reg0} chip 0
     input  logic [47:0] regs1,
+    input  logic        mcat,           // game select (tile ROM sizes)
 
     output logic [11:0] vram_addr,      // word address in the chip's 0x2000-byte RAM (both chips)
     input  logic [15:0] vram0_q,
@@ -63,13 +64,20 @@ module nost_tilemap (
     wire flipy = !r1[15];
     wire [15:0] vq = layer ? vram1_q : vram0_q;
 
-    function automatic [15:0] mod3000(input [15:0] c);      // c % 0x3000
-        logic [3:0] n;
-        logic [3:0] q3;
-        n  = c[15:12];
-        q3 = (n >= 4'd15) ? 4'd15 : (n >= 4'd12) ? 4'd12 : (n >= 4'd9) ? 4'd9 :
-             (n >= 4'd6)  ? 4'd6  : (n >= 4'd3)  ? 4'd3  : 4'd0;
-        mod3000 = {n - q3, c[11:0]};
+    // MAME draws 8x8 element code * 4 + q modulo the region's element count (gfx_element
+    // get_data): 16x16 code % (region bytes / 128). nost: bg0 / bg1 0x180000 -> % 0x3000;
+    // mcatadv: bg0 0x80000 -> % 0x1000, bg1 0x280000 -> % 0x5000.
+    function automatic [15:0] code_wrap(input [15:0] c, input mc, input lyr);
+        logic [3:0] n, q;
+        n = c[15:12];
+        if (!mc)
+            q = (n >= 4'd15) ? 4'd15 : (n >= 4'd12) ? 4'd12 : (n >= 4'd9) ? 4'd9 :
+                (n >= 4'd6)  ? 4'd6  : (n >= 4'd3)  ? 4'd3  : 4'd0;
+        else if (lyr)
+            q = (n >= 4'd15) ? 4'd15 : (n >= 4'd10) ? 4'd10 : (n >= 4'd5) ? 4'd5 : 4'd0;
+        else
+            q = n;
+        code_wrap = {n - q, c[11:0]};
     endfunction
 
     assign busy = st != S_IDLE;
@@ -143,9 +151,9 @@ module nost_tilemap (
             end
             S_ENT3: begin
                 logic [15:0] c;
-                c = mod3000(vq);
-                // SDRAM byte (layer ? 0x600000 : 0x400000) + code * 128 + row * 8
-                mem_addr <= (layer ? 25'h300000 : 25'h200000) + {5'd0, c[13:0], sy[3:0], 2'b00};
+                c = code_wrap(vq, mcat, layer);
+                // SDRAM byte (layer ? 0xD00000 : 0x400000) + code * 128 + row * 8
+                mem_addr <= (layer ? 25'h680000 : 25'h200000) + {4'd0, c[14:0], sy[3:0], 2'b00};
                 mem_req  <= 1'b1;
                 st       <= S_FETCH;
             end

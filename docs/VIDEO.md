@@ -48,7 +48,8 @@ flip Y (r1 bit 15 = 0): scrolly -= 141, source y = (223 + scrolly - y) & 511, el
 
 Tile (sy >> 4) * 32 + (sx >> 4): word0 = {category[1:0], colour[5:0], -}, word1 = code. 16x16 tiles
 are four 8x8 `gfx_8x8x4_packed_msb` elements code*4 + {TL, TR, BL, BR}; MAME takes the 8x8 code
-modulo the region's 0xC000 elements, i.e. code % 0x3000. Pen 0 is transparent. Palette index =
+modulo the region's element count, i.e. code % 0x3000 (Nostradamus, both layers) or code % 0x1000
+(bg0) / % 0x5000 (bg1) for Magical Cat Adventure (`code_wrap` in both tilemap engines). Pen 0 is transparent. Palette index =
 ((colour + bank * 0x40) % 0x200) * 16 + pen (bank = r2 & 0xF: layer 0 uses 1, layer 1 uses 3), kept
 to 12 bits. r2 bit 4 disables the layer. The game uses only the 16x16 tile RAM (MAME maps no 8x8
 RAM for this board), so register 1 bit 13 has no effect.

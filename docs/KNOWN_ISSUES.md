@@ -30,3 +30,9 @@ Deviations from MAME that are deliberate or understood, and PCB facts that are u
 10. **Unknown inputs.** P1 bits 5/6 and P2 bits 5/6 (buttons 2/3) are wired to MiSTer buttons 2/3
     because the test mode uses them; MAME leaves them unconnected. P1 bit 9 ("test 3 in test mode")
     is not wired (reads 1, as MAME). P1 bit 11 reads 0 (required).
+11. **Magical Cat Adventure specifics.** The coin DIPs' meaning depends on *Coin Mode* (MAME
+    PORT_CONDITION); the MRA lists both readings per setting ("Mode 1/Mode 2"). The coin counter /
+    lockout write at 0x900000 is ignored (MAME leaves it unmapped too). Its game-select byte comes
+    from the MRA (ioctl index 1); without it (an old MRA) the core runs as Nostradamus.
+12. **Clones.** `nostj`, `nostk`, `mcatadvj` and `catt` use the same hardware in MAME but have no
+    MRA yet (`catt` also has a 1 MB `bg0` and ADPCM-A ROM, which fit the slots).

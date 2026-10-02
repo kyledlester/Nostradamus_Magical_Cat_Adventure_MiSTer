@@ -1,5 +1,10 @@
 # Architecture
 
+One core for both LINDA games: the MRA's ioctl index 1 byte selects Magical Cat Adventure
+(`nost_core.mcat`), which changes only the Z80 memory map and mix level (`nost_sound`), unused input
+and DIP bits (`nost_core`), the tile-code wrap (`nost_tilemap`, `nost_tilemap_cave`) and the
+screen rotation (top level); everything else is shared, as in MAME's driver.
+
 ```
                  clk_sys 98.058240 MHz (nost_pll) - main board and video are clock enables of it
  HPS ioctl ──► nost_loader ──► nost_sdram_arb ◄── 68000 ROM cache (nost_rom_cache, in nost_main)

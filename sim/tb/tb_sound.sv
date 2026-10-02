@@ -11,7 +11,11 @@
 // +ROMLAT=<clocks> latency (default 6 = 375 ns, about the production SDRAM path).
 // Audio: build/sim/sound.raw (signed 16-bit mono, 1 MHz).
 // Plusargs: +MS=<milliseconds to run after the reset> (default 400), +N=<writes, 0 = all>,
-// +STRACE=<file>, +SOUNDRAW=<file>.
+// +STRACE=<file>, +SOUNDRAW=<file>, +SIMDIR=<dir with soundcpu/adpcma/zfix hex> (default local/sim).
+// +MCAT: Magical Cat Adventure (mcatadv map: YM2610 at E000-E003 and bank at F000 are memory
+// writes, compared with MAME's "Z t W <4-digit address>" lines). Its Z80 idles in a loop that
+// rewrites the bank register and latch 2 with unchanged values; for mcat a bank / latch 2 write is
+// compared only when its value differs from the previous write to that address (on both sides).
 `timescale 1ns/1ps
 module tb_sound;
     logic clk = 0;
@@ -33,8 +37,10 @@ module tb_sound;
     logic signed [15:0] snd;
     logic [15:0] c_lat, c_ym, c_nmi, c_zmiss;
 
+    logic mcat = 0;
+    initial if ($test$plusargs("MCAT")) mcat = 1;
     nost_sound #(.CE_NUM(1), .CE_DEN(2)) dut (
-        .clk(clk_sys), .clk_snd(clk), .reset(reset), .pause(1'b0),
+        .clk(clk_sys), .clk_snd(clk), .reset(reset), .pause(1'b0), .mcat(mcat),
         .latch(latch), .latch_wr(latch_wr), .latch2(latch2),
         .zfix_we(1'b0), .zfix_waddr('0), .zfix_wdata('0),
         .zrom_req(zrom_req), .zrom_line(zrom_line), .zrom_ack(zrom_ack), .zrom_data(zrom_data),
@@ -44,9 +50,16 @@ module tb_sound;
     // ROM line responders
     logic [7:0] zrom [0:262143];
     logic [7:0] arom [0:1048575];
+    string simdir;
     initial begin
-        $readmemh("local/sim/soundcpu.hex", zrom);
-        $readmemh("local/sim/adpcma.hex", arom);
+        if (!$value$plusargs("SIMDIR=%s", simdir)) simdir = "local/sim";
+        $readmemh({simdir, "/soundcpu.hex"}, zrom);
+        $readmemh({simdir, "/adpcma.hex"}, arom);
+        if (simdir != "local/sim") begin              // block-RAM copy of 0000-7FFF (else INIT)
+            #1;
+            $readmemh({simdir, "/zfix_lo.hex"}, dut.zfix_lo.mem);
+            $readmemh({simdir, "/zfix_hi.hex"}, dut.zfix_hi.mem);
+        end
         if ($test$plusargs("ZPATCH")) begin   // scripts/mame/bootpatch.lua Z80 part: skip ROM checksum
             zrom[18'h5F9] = 8'hC3; zrom[18'h5FA] = 8'h04; zrom[18'h5FB] = 8'h06;
             dut.zfix_hi.mem[14'h2FC] = 8'hC3; dut.zfix_lo.mem[14'h2FD] = 8'h04; dut.zfix_hi.mem[14'h2FD] = 8'h06;
@@ -71,6 +84,17 @@ module tb_sound;
         end
     end
 
+    // mcat: drop bank (F000) / latch 2 (80) writes that repeat the previous value (side 0 = MAME,
+    // 1 = FPGA)
+    int last_bank [2] = '{-1, -1};
+    int last_l2 [2] = '{-1, -1};
+    function automatic bit keep_write(int a, int v, int side);
+        if (!$test$plusargs("MCAT")) return 1;
+        if (a == 'hF000) begin if (v == last_bank[side]) return 0; last_bank[side] = v; end
+        if (a == 'h80)   begin if (v == last_l2[side])   return 0; last_l2[side] = v; end
+        return 1;
+    endfunction
+
     // MAME trace (times relative to the 3.0 s watchdog reset)
     real   lat_t [$]; int lat_v [$];
     real   w_t [$]; int w_a [$]; int w_d [$];
@@ -94,7 +118,7 @@ module tb_sound;
                 if (t0 >= 0) begin lat_t.push_back(tt - t0); lat_v.push_back(v); end end
             else begin
                 r = $fscanf(fd, "%f %s %h %h\n", tt, rw, a, v);
-                if (t0 >= 0 && rw == "W") begin w_t.push_back(tt - t0); w_a.push_back(a); w_d.push_back(v); end
+                if (t0 >= 0 && rw == "W" && keep_write(a, v, 0)) begin w_t.push_back(tt - t0); w_a.push_back(a); w_d.push_back(v); end
             end
         end
         $fclose(fd);
@@ -108,6 +132,16 @@ module tb_sound;
             // +PRE01: the boot handshake command first (the Z80 program answers it and checksums its
             // ROM banks, ~3 s), as the 68000 does at boot
             if ($test$plusargs("PRE01")) begin nt.push_back(100000.0); nv.push_back(8'h01); end
+            // +PRE=<hex>[,<hex>]: up to two commands first (100 / 200 ms), e.g. Magical Cat's boot
+            // (EF) and coin (1F) commands before its game-start command
+            begin
+                string pre; int p1, p2, n;
+                if ($value$plusargs("PRE=%s", pre)) begin
+                    n = $sscanf(pre, "%h,%h", p1, p2);
+                    if (n >= 1) begin nt.push_back(100000.0); nv.push_back(p1); end
+                    if (n >= 2) begin nt.push_back(200000.0); nv.push_back(p2); end
+                end
+            end
             foreach (lat_t[i]) if (lat_t[i] >= shift_from) begin nt.push_back(lat_t[i] - shift_from + at); nv.push_back(lat_v[i]); end
             lat_t = nt; lat_v = nv;
             w_t.delete(); w_a.delete(); w_d.delete();
@@ -138,20 +172,23 @@ module tb_sound;
     int wi = 0, errors = 0; real maxdt = 0;
     logic wr_n_d = 1;
     always @(posedge clk) begin
+        int ga;
         wr_n_d <= dut.wr_n;
-        if (!reset && wr_n_d && !dut.wr_n && !dut.iorq_n) begin
+        ga = !dut.iorq_n ? dut.A[7:0] : dut.A;
+        if (!reset && wr_n_d && !dut.wr_n && (!dut.iorq_n || (mcat && !dut.mreq_n &&
+            (dut.A[15:2] == 14'h3800 || dut.A == 16'hF000))) && keep_write(ga, dut.cpu_do, 1)) begin
             if (wi < w_t.size()) begin
                 real dt;
                 dt = t_us - w_t[wi];
                 if (dt < 0) dt = -dt;
                 if (dt > maxdt) maxdt = dt;
-                if (dut.A[7:0] != w_a[wi] || dut.cpu_do != w_d[wi]) begin
+                if (ga != w_a[wi] || dut.cpu_do != w_d[wi]) begin
                     errors++;
                     if (errors <= 5) $display("MISMATCH write %0d at %.1f us: FPGA %02x=%02x MAME %02x=%02x (MAME t=%.1f)",
-                        wi, t_us, dut.A[7:0], dut.cpu_do, w_a[wi], w_d[wi], w_t[wi]);
+                        wi, t_us, ga, dut.cpu_do, w_a[wi], w_d[wi], w_t[wi]);
                 end
             end
-            if ($test$plusargs("SHOWW") && wi < w_t.size()) $display("W %0d FPGA %.2f MAME %.2f %02x=%02x", wi, t_us, w_t[wi], dut.A[7:0], dut.cpu_do);
+            if ($test$plusargs("SHOWW") && wi < w_t.size()) $display("W %0d FPGA %.2f MAME %.2f %02x=%02x", wi, t_us, w_t[wi], ga, dut.cpu_do);
             wi++;
             if (wi % 2000 == 0) $display("progress: %0d writes, %.0f ms, max offset %.1f us, errors %0d", wi, t_us / 1000.0, maxdt, errors);
             if (max_n != 0 && wi >= max_n) finish_run();

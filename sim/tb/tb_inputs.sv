@@ -60,7 +60,19 @@ module tb_inputs;
         #20;
         expect16("DSW1 lives 5", dut.dsw1, 16'hFC00);
         expect16("DSW2 coin A free play", dut.dsw2, 16'hF800);
-        if (errors == 0) $display("PASS M4_INPUTS: %0d checks (joystick/button/coin/start/service bits, P1 bit 11, DIP download)", checks);
+        // Magical Cat Adventure (game select byte 01, ioctl index 1): MAME INPUT_PORTS_START( mcatadv )
+        @(posedge clk); ioctl_download <= 1; ioctl_index <= 16'd1; ioctl_dout <= 16'h0001; ioctl_wr <= 1;
+        @(posedge clk); ioctl_wr <= 0;
+        @(posedge clk); ioctl_download <= 0;
+        #20;
+        expect16("mcat P1 idle (bit 11 = 1)", dut.p1, 16'hFFFF);
+        expect16("mcat P2 idle", dut.p2, 16'hFFFF);
+        joy0 = 32'h20; #20; expect16("mcat P1 jump (button 2)", dut.p1, 16'hFFDF); joy0 = 0;
+        joy1 = 32'h40; #20; expect16("mcat P2 bit 6 unused", dut.p2, 16'hFFFF); joy1 = 0;
+        joy1 = 32'h200; #20; expect16("mcat P2 service", dut.p2, 16'hFDFF); joy1 = 0;
+        expect16("mcat DSW1 (bits 7-0 = 1)", dut.dsw1, 16'hFCFF);
+        expect16("mcat DSW2 (bits 7-0 = 1)", dut.dsw2, 16'hF8FF);
+        if (errors == 0) $display("PASS M4_INPUTS: %0d checks (joystick/button/coin/start/service bits, P1 bit 11, DIP download, Magical Cat mapping)", checks);
         else $display("FAIL M4_INPUTS: %0d of %0d checks failed", errors, checks);
         $finish;
     end

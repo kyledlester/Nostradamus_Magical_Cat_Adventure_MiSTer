@@ -1,6 +1,7 @@
 # Memory map
 
-From MAME 0.289 `mcatadv_state::main_map`, `nost_sound_map`, `nost_sound_io_map`
+From MAME 0.289 `mcatadv_state::main_map` (both games), `nost_sound_map`, `nost_sound_io_map`,
+`mcatadv_sound_map`, `mcatadv_sound_io_map`
 (`src/mame/misc/mcatadv.cpp`), implemented in `rtl/nost/nost_main.sv` and `rtl/nost/nost_sound.sv`.
 
 ## 68000 (16 MHz)
@@ -19,25 +20,25 @@ From MAME 0.289 `mcatadv_state::main_map`, `nost_sound_map`, `nost_sound_io_map`
 | 602000-602FFF | RW | RAM | BRAM 4 KB |
 | 700000-707FFF | RW | sprite RAM, two halves of 2048 x 4 words | BRAM (4 word banks); vblank copy of one half to a 16 KB display buffer |
 | 708000-70FFFF | RW | RAM ("tests more than is needed?") | BRAM 32 KB |
-| 800000 | R | P1 (active low): 0 up, 1 down, 2 left, 3 right, 4 button 1, 5/6 unknown (buttons 2/3 in test mode), 7 start 1, 8 coin 1, 9 unknown, **11 active high, reads 0** | joystick 0 |
-| 800002 | R | P2: as P1 with 7 start 2, 8 coin 2, **9 SERVICE1** | joystick 1 (service: either player) |
-| A00000 | R | DSW1 = {SW1, 0x00} | MRA DIP byte 0 |
-| A00002 | R | DSW2 = {SW2, 0x00} | MRA DIP byte 1 |
+| 800000 | R | P1 (active low): 0 up, 1 down, 2 left, 3 right, 4 button 1, 5/6 nost: unknown (buttons 2/3 in test mode), mcatadv: jump / button 3 (test mode), 7 start 1, 8 coin 1, 9 unknown; nost: **11 active high, reads 0**; mcatadv: 9-15 read 1 | joystick 0 |
+| 800002 | R | P2: as P1 with 7 start 2, 8 coin 2, **9 SERVICE1** (mcatadv: bit 6 unknown, reads 1) | joystick 1 (service: either player) |
+| A00000 | R | DSW1 = {SW1, 0x00} (mcatadv: {SW1, 0xFF}) | MRA DIP byte 0 |
+| A00002 | R | DSW2 = {SW2, 0x00} (mcatadv: {SW2, 0xFF}) | MRA DIP byte 1 |
 | B00000-B0000F | RW | vidregs (buffered at vblank; word 0/1 live = sprite X/Y offsets + 0x184/0x1F1, word 2 buffered = sprite half) | registers |
-| B00018 | W | watchdog reset | 3 s watchdog (MAME guess) |
-| B0001E | R | watchdog reset (Magical Cat), returns 0x0C00 | |
+| B00018 | W | watchdog reset (used by Nostradamus) | 3 s watchdog (MAME guess) |
+| B0001E | R | watchdog reset (used by Magical Cat), returns 0x0C00 | both games: MAME maps both |
 | C00000 | W | sound latch (low byte; MAME umask 0x00FF) -> Z80 NMI | |
 | C00001 | R | latch 2 (Z80 -> 68000); a word read returns {0x00, latch 2} | |
-| other | | unmapped: reads 0, writes ignored (the game writes 0x900000 once: Magical Cat's coin counter) | |
+| other | | unmapped: reads 0, writes ignored (Nostradamus writes 0x900000 once: Magical Cat's coin counter / lockout, unmapped in MAME) | |
 
 Interrupts: IRQ1 (autovector) at vblank start (line 224), held until acknowledged.
 
-## Z80 (4 MHz)
+## Z80 (4 MHz), Nostradamus (`nost_sound_map` / `nost_sound_io_map`)
 
 | Address | Contents | FPGA |
 | --- | --- | --- |
-| 0000-7FFF | ROM (first 32 KB of `nos-ps.u9`) | SDRAM 0x0100000 through a 4 KB cache (WAIT_n on a miss) |
-| 8000-BFFF | ROM bank: page n (16 KB) of the 256 KB ROM, n = port 40 (MAME starts with page 1) | same cache |
+| 0000-7FFF | ROM (first 32 KB of `nos-ps.u9`) | block RAM copy written by the loader (no wait states) |
+| 8000-BFFF | ROM bank: page n (16 KB) of the 256 KB ROM, n = port 40 (MAME starts with page 1) | SDRAM 0x0100000 through a 4 KB cache with next-line prefetch (WAIT_n on a miss) |
 | C000-DFFF | RAM | BRAM 8 KB |
 
 | Port (A7-A0) | R/W | Contents |
@@ -45,6 +46,21 @@ Interrupts: IRQ1 (autovector) at vblank start (line 224), held until acknowledge
 | 00-03 | W | YM2610 (address/data, part 0 and 1) |
 | 04-07 | R | YM2610 (status 0, data, status 1, -) |
 | 40 | W | ROM bank |
+| 80 | R | sound latch (clears NMI) |
+| 80 | W | latch 2 |
+
+## Z80 (4 MHz), Magical Cat Adventure (`mcatadv_sound_map` / `mcatadv_sound_io_map`)
+
+| Address | R/W | Contents | FPGA |
+| --- | --- | --- | --- |
+| 0000-3FFF | R | ROM (first 16 KB of `u9.bin`) | block RAM copy |
+| 4000-BFFF | R | ROM window: 32 KB from page n * 16 KB of the 128 KB ROM (MAME starts with page 1) | SDRAM cache as above |
+| C000-DFFF | RW | RAM | BRAM 8 KB |
+| E000-E003 | RW | YM2610 (write: address/data part 0/1; read: status 0, data, status 1, -) | |
+| F000 | W | ROM bank n | |
+
+| Port (A7-A0) | R/W | Contents |
+| --- | --- | --- |
 | 80 | R | sound latch (clears NMI) |
 | 80 | W | latch 2 |
 

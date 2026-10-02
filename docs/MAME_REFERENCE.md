@@ -7,10 +7,10 @@ MAME is the executable behavioural specification. Facts measured from MAME are m
 | --- | --- |
 | MAME binary | 0.289 (`mame0289`), `C:\Users\klest\Downloads\mame\mame.exe` |
 | MAME source | tag `mame0289`, commit `f34f02505e32c1993c6a782b6814232cbfc74e36`; files extracted to `local/mame_src/` (not committed) |
-| Driver | `src/mame/misc/mcatadv.cpp` (`mcatadv_state`, machine `nost`) |
+| Driver | `src/mame/misc/mcatadv.cpp` (`mcatadv_state`, machines `nost` and `mcatadv`) |
 | Tilemap device | `src/devices/video/tmap038.cpp/.h` (`tilemap038_device`) |
 | Also read | `src/emu/tilemap.h` (`tile_data::set`: code `%` elements, colour `%` colours), `devices/video/bufsprite.h`, `devices/machine/gen_latch.*`, `emu/screen.cpp` |
-| ROM set | `nost.zip`, 14 files; `mame -verifyroms nost`: **romset nost is good** (CRCs in `scripts/romtool.py`) |
+| ROM sets | `nost.zip`, 14 files; `mame -verifyroms nost`: **romset nost is good**. `mcatadv.zip`, 14 files; `mame -verifyroms mcatadv`: **romset mcatadv is good** (CRCs in `scripts/romtool.py`) |
 | Target | MiSTer DE10-Nano + 32 MB SDRAM module |
 | Tools | Quartus Prime Lite 17.0.0 Build 595; ModelSim-Intel Starter 10.5b; Python 3.10.11 |
 
@@ -82,3 +82,20 @@ is derived from `screen:time_until_pos(0,0)`, `frame_period` and `scan_period` (
 So in steady state everything the tilemaps use is written during vblank; a renderer reading tile
 RAM / line RAM / registers live during lines 0-223 sees the same values MAME uses at its render
 instant (vblank start, line 224).
+
+## Magical Cat Adventure (`mcatadv`, from the driver)
+
+Same board as `nost` (`mcatadv` is the base machine config; `nost` derives from it) except:
+
+* Z80 `mcatadv_sound_map` / `mcatadv_sound_io_map`: 0000-3FFF ROM, 4000-BFFF bank window (32 KB),
+  C000-DFFF RAM, E000-E003 YM2610 (memory mapped, read and write), F000 bank; I/O only 80
+  (sound latch / latch 2). ROM 128 KB.
+* YM2610 routes: SSG x 1.0, FM+ADPCM left/right x 0.5 each.
+* Inputs `INPUT_PORTS_START( mcatadv )` (button 2 = jump, no active-high P1 bit 11; DSW low bytes
+  IPT_UNKNOWN active low), ROT0, region sizes in docs/ROM_LAYOUT.md.
+* Boot **(measured)**: the cold start writes "MASICAL CAT ADVENTURE" to work RAM (0x100048) and
+  waits for the 3 s watchdog; it kicks the watchdog by reading 0xB0001E. IRQ1 handler 0x000900.
+* Sound **(measured)**: the attract mode is silent (one sound command, 0xEF, at 3.65 s in 25 s);
+  the Z80 idles in a loop that rewrites the bank register (F000) and latch 2 (port 80) with
+  unchanged values (about 28,000 times per second). Coin + start + play (`local/mcatadv/play_inputs.txt`)
+  gives 44 sound commands in 40 s.

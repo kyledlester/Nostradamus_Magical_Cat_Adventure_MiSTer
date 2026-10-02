@@ -1,6 +1,11 @@
-// Nostradamus MiSTer core -- Z80 sound board.
+// LINDA board MiSTer core -- Z80 sound board.
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
+// mcat = 1: MAME 0.289 mcatadv_sound_map / mcatadv_sound_io_map (Magical Cat Adventure):
+//   0000-3FFF ROM, 4000-BFFF ROM bank window (32 KB from bank * 0x4000 of the 128 KB ROM),
+//   C000-DFFF RAM, E000-E003 RW YM2610, F000 W bank; I/O 80 R sound latch / W latch 2.
+//   Mix: SSG x 1.0 (route 0), FM/ADPCM x 0.5 each. Everything else as below.
+// mcat = 0 (Nostradamus):
 // MAME 0.289 mcatadv_state::nost_sound_map / nost_sound_io_map (docs/AUDIO.md):
 //   Z80 (T80s) at 4 MHz: 0000-7FFF ROM, 8000-BFFF ROM bank (16 KB pages of the 256 KB ROM, bank
 //   register = port 40, MAME's initial page 1, not changed by a reset), C000-DFFF RAM.
@@ -23,6 +28,7 @@ module nost_sound #(
     input  logic        clk_snd,        // sound board clock
     input  logic        reset,          // clk_sys domain (board reset or watchdog)
     input  logic        pause,          // clk_sys domain
+    input  logic        mcat,           // game select (static while running)
 
     input  logic  [7:0] latch,          // 68000 -> Z80
     input  logic        latch_wr,       // one clk_sys pulse per 68000 write
@@ -52,6 +58,10 @@ module nost_sound #(
     output logic [15:0] dbg_zmisses
 );
     // ------------------------------------------------------------------ clk_snd domain basics
+    // game select, registered in this domain (static while the board runs: it is written during
+    // the MRA download, under reset)
+    logic mcat_s = 1'b0;
+    always_ff @(posedge clk_snd) mcat_s <= mcat;
     // Reset is synchronised and lasts at least 4096 clk_snd (> 600 ce_8m) counted from its
     // assertion so the jt10 pipelines take their reset values (enables keep running in reset).
     logic [2:0]  rst_s = 3'b111;
@@ -120,12 +130,15 @@ module nost_sound #(
 
     wire mem     = !mreq_n && rfsh_n;
     wire io      = !iorq_n && m1_n;
-    wire sel_fix = mem && !A[15];                     // 0000-7FFF: block RAM, no wait states
-    wire sel_rom = mem && A[15:14] == 2'b10;          // 8000-BFFF bank window: SDRAM cache
+    // nost: 0000-7FFF fixed (block RAM, no wait states), 8000-BFFF bank window (SDRAM cache)
+    // mcat: 0000-3FFF fixed, 4000-BFFF bank window
+    wire sel_fix = mem && (mcat_s ? A[15:14] == 2'b00 : !A[15]);
+    wire sel_rom = mem && (mcat_s ? (A[15:14] == 2'b01 || A[15:14] == 2'b10) : A[15:14] == 2'b10);
     wire sel_ram = mem && A[15:13] == 3'b110;
-    wire sel_ymw = io && A[7:2] == 6'b000000;       // 00-03
-    wire sel_ymr = io && A[7:2] == 6'b000001;       // 04-07
-    wire sel_bnk = io && A[7:0] == 8'h40;
+    wire sel_ymm = mem && mcat_s && A[15:2] == 14'h3800;                 // E000-E003 (mcat)
+    wire sel_ymw = (io && !mcat_s && A[7:2] == 6'b000000) || (sel_ymm && !wr_n);   // nost: 00-03
+    wire sel_ymr = (io && !mcat_s && A[7:2] == 6'b000001) || (sel_ymm && !rd_n);   // nost: 04-07
+    wire sel_bnk = mcat_s ? (mem && A == 16'hF000) : (io && A[7:0] == 8'h40);
     wire sel_lat = io && A[7:0] == 8'h80;
 
     // one strobe per write / read cycle
@@ -163,11 +176,12 @@ module nost_sound #(
     wire [7:0] fix_q = A[0] ? fix_hi_q : fix_lo_q;
 
     // ------------------------------------------------------------------ Z80 ROM cache (bank window)
-    // direct-mapped, 512 lines of 8 bytes; ROM address = A (0000-7FFF) or bank * 0x4000 + A[13:0].
+    // direct-mapped, 512 lines of 8 bytes; ROM address = bank * 0x4000 + A[13:0] (nost, 8000-BFFF)
+    // or bank * 0x4000 + (A - 0x4000) (mcat, 4000-BFFF).
     // Next-line prefetch: while the Z80 reads a line that hits, the following line is fetched if it
     // is not present, so sequential code and data (e.g. the boot-time ROM checksum) do not stall the
     // Z80 (the board's ROM has no wait states; MAME neither).
-    wire [17:0] zaddr = A[15] ? {bank, A[13:0]} : {3'b000, A[14:0]};
+    wire [17:0] zaddr = {bank + {3'b000, mcat_s && A[15]}, A[13:0]};
     logic [2:0]  zrq_s;
     logic        zack;
     logic [2:0]  zack_s;
@@ -349,11 +363,12 @@ module nost_sound #(
     // ------------------------------------------------------------------ mix (clk_snd), output (clk)
     // ymfm SSG amplitude ~ jt49 8-bit level * 64.25; MAME: ssg * 2/3 * 0.6 + (l + r) * 0.5
     //   = (A + B + C) * 25.7 + (L + R) / 2   -> integer: ((A+B+C) * 1645 + (L+R) * 32) >> 6
+    // mcat (SSG route 1.0): (A + B + C) * 42.83 -> 2741
     logic signed [15:0] snd_s;
     always_ff @(posedge clk) snd <= snd_s;
     always_ff @(posedge clk_snd) begin
         logic signed [24:0] acc;
-        acc = ($signed({15'd0, psg_a} + {15'd0, psg_b} + {15'd0, psg_c}) * 25'sd1645 +
+        acc = ($signed({15'd0, psg_a} + {15'd0, psg_b} + {15'd0, psg_c}) * (mcat_s ? 25'sd2741 : 25'sd1645) +
                ($signed(fm_l) + $signed(fm_r)) * 25'sd32) >>> 6;
         if (acc > 25'sd32767) snd_s <= 16'sd32767;
         else if (acc < -25'sd32768) snd_s <= -16'sd32768;

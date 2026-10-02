@@ -5,6 +5,14 @@
 -- Output: $NOST_OUT. Reference for sim/tb/tb_boot.sv.
 _G.nost_runs = (_G.nost_runs or 0) + 1
 if _G.nost_runs <= tonumber(os.getenv("NOST_RESETS") or "1") then return end
+-- $NOST_RAM (optional): work RAM 100000-10FFFF as MAME holds it when logging starts (after the
+-- reset, which keeps RAM), 32768 hex words, for tb_boot +RAMIMG.
+if os.getenv("NOST_RAM") then
+  local ram = manager.machine.devices[":maincpu"].spaces["program"]
+  local f = io.open(os.getenv("NOST_RAM"), "w")
+  for a = 0x100000, 0x10fffe, 2 do f:write(string.format("%04x\n", ram:read_u16(a))) end
+  f:close()
+end
 local out = io.open(os.getenv("NOST_OUT") or "bus_trace.txt", "w")
 local n, max = 0, tonumber(os.getenv("NOST_N") or "20000")
 local sp = manager.machine.devices[":maincpu"].spaces["program"]

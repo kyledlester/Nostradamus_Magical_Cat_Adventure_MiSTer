@@ -16,7 +16,10 @@
 // line latency (+ROMLAT=<clocks>, default 14).
 // Latch 2 (Z80 -> 68000) is replayed from the trace: when the next MAME transaction is a read of
 // 0xC00000, the latch presents MAME's value.
-// Plusargs: +TRACE=<file> (default local/bus_trace.txt), +N=<transactions> (default 20000).
+// Plusargs: +TRACE=<file> (default local/bus_trace.txt), +N=<transactions> (default 20000),
+// +ROMHEX=<file> (default local/sim/maincpu.hex), +RAMIMG=<file> (work RAM at the reset, 32768 hex
+// words from bus_trace.lua NOST_RAM, instead of the 'nost' signature), +MCAT (Magical Cat
+// Adventure port values: P1 FFFF, DSW low bytes FF).
 `timescale 1ns/1ps
 module tb_boot #(parameter int WD_TICKS = 96_000_000);
     logic clk = 0;
@@ -33,7 +36,13 @@ module tb_boot #(parameter int WD_TICKS = 96_000_000);
 
     // ROM line model
     logic [15:0] rom [0:524287];
-    initial $readmemh("local/sim/maincpu.hex", rom);
+    string romhex;
+    initial begin
+        if (!$value$plusargs("ROMHEX=%s", romhex)) romhex = "local/sim/maincpu.hex";
+        $readmemh(romhex, rom);
+    end
+    logic [15:0] p1v = 16'hF7FF, dswv = 16'hFF00;
+    initial if ($test$plusargs("MCAT")) begin p1v = 16'hFFFF; dswv = 16'hFFFF; end
     logic        rom_req, rom_ack;
     logic [19:3] rom_line;
     logic [63:0] rom_data;
@@ -66,7 +75,7 @@ module tb_boot #(parameter int WD_TICKS = 96_000_000);
         .clk(clk), .reset(reset), .phi1(phi1), .phi2(phi2), .tick32(tick32),
         .rom_req(rom_req), .rom_line(rom_line), .rom_ack(rom_ack), .rom_data(rom_data),
         .vblank_evt(vblank_evt),
-        .p1(16'hF7FF), .p2(16'hFFFF), .dsw1(16'hFF00), .dsw2(16'hFF00),
+        .p1(p1v), .p2(16'hFFFF), .dsw1(dswv), .dsw2(dswv),
         .snd_latch(latch), .snd_latch_wr(latch_wr), .latch2(latch2), .soft_reset(soft_reset),
         .vram0_addr(12'd0), .vram0_q(vq0), .vram1_addr(12'd0), .vram1_q(vq1),
         .pal_addr(12'd0), .pal_q(pq), .sbuf_addr(11'd0), .sbuf_q(sq),
@@ -99,7 +108,7 @@ module tb_boot #(parameter int WD_TICKS = 96_000_000);
     // trace with one record of lookahead
     int fd, n = 0, max_n = 20000;
     bit spun = 0;
-    string trace;
+    string trace, ramimg;
     string nkind; int naddr, ndata, nmask, nr;
     task automatic next_rec();
         nr = $fscanf(fd, "%s %h %h %h\n", nkind, naddr, ndata, nmask);
@@ -113,7 +122,11 @@ module tb_boot #(parameter int WD_TICKS = 96_000_000);
         if (fd == 0) begin $display("FAIL M2_BOOT: cannot open %s", trace); $finish; end
         next_rec();
         // post-watchdog state: signature in work RAM (word 0x0E/0x0F of 0x100000)
-        if (!$test$plusargs("WDTEST")) begin
+        if ($value$plusargs("RAMIMG=%s", ramimg)) begin
+            logic [15:0] img [0:32767];
+            $readmemh(ramimg, img);
+            for (int i = 0; i < 32768; i++) begin dut.ram.hi[i] = img[i][15:8]; dut.ram.lo[i] = img[i][7:0]; end
+        end else if (!$test$plusargs("WDTEST")) begin
             dut.ram.hi[15'h0E] = 8'h6E; dut.ram.lo[15'h0E] = 8'h6F;
             dut.ram.hi[15'h0F] = 8'h73; dut.ram.lo[15'h0F] = 8'h74;
         end

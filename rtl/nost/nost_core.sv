@@ -1,4 +1,4 @@
-// Nostradamus MiSTer core -- board top.
+// LINDA board MiSTer core (Nostradamus / Magical Cat Adventure) -- board top.
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // docs/ARCHITECTURE.md. Everything runs on clk_sys (98.058240 MHz) with clock enables, except the
@@ -8,6 +8,10 @@
 //   nost_loader        -> ROM stream to SDRAM           nost_main  -> 68000 board
 //   nost_video         -> 038 x2 tilemaps, sprites, mixer  nost_sound -> Z80, YM2610
 //   nost_sdram_arb     -> SDRAM channel 1 (loader > 68000 ROM > ADPCM-A > Z80 ROM > tiles > sprites)
+// Game select (MRA ioctl index 1 byte): 0 = Nostradamus (MAME nost), 1 = Magical Cat Adventure
+// (MAME mcatadv). Same board in MAME (mcatadv.cpp); differences: Z80 memory/I/O map and SSG level
+// (nost_sound), inputs and unused DIP/input bits (below), tile ROM sizes (code wrap in the tilemap
+// engines) and the screen orientation (top level).
 module nost_core #(
     parameter int SND_CE_NUM = 3125,     // sound board ce_8m = SND_CE_NUM / SND_CE_DEN of clk_snd
     parameter int SND_CE_DEN = 19152
@@ -47,6 +51,7 @@ module nost_core #(
     output logic        hsync,
     output logic        vsync,
     output logic        vb_next,        // vertical blank of the line after the current output line
+    output logic        mcat,           // game select: Magical Cat Adventure
     output logic signed [15:0] snd
 );
     // ------------------------------------------------------------------ clocks / raster
@@ -73,6 +78,14 @@ module nost_core #(
         if (ioctl_download && ioctl_wr && ioctl_index == 16'd254 && ioctl_addr[26:1] == 0)
             dsw <= ioctl_dout;
 
+    // ------------------------------------------------------------------ game select (index 1)
+    // power-up 0 (Nostradamus MRAs send 00 too); kept across resets and other downloads
+    logic mcat_r = 1'b0;
+    always_ff @(posedge clk)
+        if (ioctl_download && ioctl_wr && ioctl_index == 16'd1 && ioctl_addr[26:1] == 0)
+            mcat_r <= ioctl_dout[0];
+    assign mcat = mcat_r;
+
     // ------------------------------------------------------------------ inputs (MAME active low)
     // MiSTer joystick: 0 right, 1 left, 2 down, 3 up, 4-6 buttons 1-3, 7 start, 8 coin,
     // 9 service, 10 pause (CONF_STR J1).
@@ -80,13 +93,16 @@ module nost_core #(
     // 5/6 "unknown" (buttons 2/3 in test mode only), 7 start, 8 coin; P2 bit 9 = SERVICE1.
     // P1 bit 11 is active high and must read 0 (MAME: "Must be LOW or startup freezes"; the boot
     // code at 0x184 waits for it). Other bits read 1.
+    // MAME INPUT_PORTS_START( mcatadv ): the same bits (button 2 = jump; P1 button 3 used by the
+    // test mode only; P2 bit 6 unknown = 1); all other bits read 1 (no bit 11 rule); DSW1/DSW2
+    // bits 7-0 are IPT_UNKNOWN active low (read 1; nost does not define them: 0).
     function automatic [15:0] player(input [31:0] j, input svc);
         player = ~{6'b000000, svc, j[8], j[7], j[6], j[5], j[4], j[0], j[1], j[2], j[3]};
     endfunction
-    wire [15:0] p1 = player(joy0, 1'b0) & 16'hF7FF;
-    wire [15:0] p2 = player(joy1, joy0[9] | joy1[9]);
-    wire [15:0] dsw1 = {dsw[7:0], 8'h00};
-    wire [15:0] dsw2 = {dsw[15:8], 8'h00};
+    wire [15:0] p1 = player(joy0, 1'b0) & (mcat ? 16'hFFFF : 16'hF7FF);
+    wire [15:0] p2 = player(joy1, joy0[9] | joy1[9]) | (mcat ? 16'h0040 : 16'h0000);
+    wire [15:0] dsw1 = {dsw[7:0], mcat ? 8'hFF : 8'h00};
+    wire [15:0] dsw2 = {dsw[15:8], mcat ? 8'hFF : 8'h00};
 
     // ------------------------------------------------------------------ loader
     logic        ld_req, ld_ack;
@@ -140,7 +156,7 @@ module nost_core #(
     logic [15:0] dbg_overruns, dbg_maxbusy;
     nost_video video (
         .clk(clk), .rst(reset), .ce_pix(ce_pix), .hcount(hcount), .vcount(vcount), .line_start(line_start),
-        .hblank_in(hb), .vblank_in(vb), .hsync_in(hs), .vsync_in(vs), .flip180(flip180), .cave038(cave038),
+        .hblank_in(hb), .vblank_in(vb), .hsync_in(hs), .vsync_in(vs), .flip180(flip180), .cave038(cave038), .mcat(mcat),
         .tm0_regs(tm0_regs), .tm1_regs(tm1_regs), .spr_gx(spr_gx), .spr_gy(spr_gy),
         .vram_addr(vram_addr), .vram0_q(vram0_q), .vram1_q(vram1_q),
         .sbuf_addr(sbuf_addr), .sbuf_q(sbuf_q), .pal_addr(pal_addr), .pal_q(pal_q),
@@ -156,14 +172,19 @@ module nost_core #(
     logic [15:0] dbg_lat_rd, dbg_ym, dbg_nmi, dbg_zmiss;
 `ifdef NOST_SIM_NO_SOUND
     // simulation-only: video/CPU benches without the Z80 board. Latch 2 echoes each command ~10 us
-    // after it is written, as the Z80 program does once running (boot handshake not modelled).
+    // after it is written, as the Nostradamus Z80 program does once running (boot handshake not
+    // modelled). Magical Cat's Z80 writes 01 while it takes a command and 00 otherwise (MAME trace),
+    // and the 68000 waits for 00 before each command.
     logic [9:0] echo_cnt = '0;
     logic [7:0] echo_v = 8'h00;
+    logic [7:0] l2 = 8'h00;
+    assign latch2 = l2;
     always_ff @(posedge clk) begin
-        if (latch_wr) begin echo_cnt <= 10'd1000; echo_v <= latch; end
+        if (latch_wr && mcat) begin echo_cnt <= 10'd1000; echo_v <= 8'h00; l2 <= 8'h01; end
+        else if (latch_wr) begin echo_cnt <= 10'd1000; echo_v <= latch; end
         else if (echo_cnt != 0) begin
             echo_cnt <= echo_cnt - 10'd1;
-            if (echo_cnt == 10'd1) latch2 <= echo_v;
+            if (echo_cnt == 10'd1) l2 <= echo_v;
         end
     end
     assign snd = '0; assign zrom_req = 1'b0; assign arom_req = 1'b0;
@@ -171,7 +192,7 @@ module nost_core #(
     assign {dbg_lat_rd, dbg_ym, dbg_nmi, dbg_zmiss} = '0;
 `else
     nost_sound #(.CE_NUM(SND_CE_NUM), .CE_DEN(SND_CE_DEN)) sound (
-        .clk(clk), .clk_snd(clk_snd), .reset(reset || soft_reset), .pause(pause),
+        .clk(clk), .clk_snd(clk_snd), .reset(reset || soft_reset), .pause(pause), .mcat(mcat),
         .latch(latch), .latch_wr(latch_wr), .latch2(latch2),
         .zfix_we(zfix_we), .zfix_waddr(zfix_waddr), .zfix_wdata(zfix_wdata),
         .zrom_req(zrom_req), .zrom_line(zrom_line), .zrom_ack(zrom_ack), .zrom_data(mem_rdata),

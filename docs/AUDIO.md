@@ -1,6 +1,7 @@
 # Audio
 
-Reference: MAME 0.289 `mcatadv.cpp` (`nost` machine config, `nost_sound_map`, `nost_sound_io_map`),
+Reference: MAME 0.289 `mcatadv.cpp` (`nost` machine config, `nost_sound_map`, `nost_sound_io_map`;
+`mcatadv` machine config, `mcatadv_sound_map`, `mcatadv_sound_io_map` for Magical Cat Adventure),
 `devices/sound/ymopn.cpp` + ymfm (`ymfm_opn.cpp`, `ymfm_ssg.cpp`, `ymfm_adpcm.cpp`),
 `devices/machine/gen_latch.cpp`. RTL: `rtl/nost/nost_sound.sv`.
 
@@ -65,3 +66,16 @@ Results so far:
 
 Simulation notes: ModelSim needs FPGA power-up zeros for jt10 (`sim/tb/zero_regs.do`); without
 them the never-reset accumulators stay X and the output is silent in simulation only.
+
+## Magical Cat Adventure
+
+Same Z80 / YM2610 / latches. Differences (MAME `mcatadv`): 128 KB Z80 ROM with 0000-3FFF fixed and
+a 32 KB bank window at 4000-BFFF (bank register = memory write to F000); the YM2610 is memory
+mapped at E000-E003 (reads and writes); I/O has only port 80. Mix: SSG x 1.0 (RTL coefficient
+2741 instead of 1645), FM/ADPCM x 0.5 each. The attract mode is silent in MAME (one command, 0xEF);
+the Z80 idles in a loop rewriting the bank register and latch 2 with unchanged values.
+
+| Check | Result |
+| --- | --- |
+| `sim.sh sound +MCAT +SIMDIR=local/mcatadv/sim +STRACE=local/mcatadv/sound_play.txt +MS=11000` (MAME trace with coin/start/play inputs, `local/mcatadv/play_inputs.txt`) | 1500/1500 YM2610 / changed bank / changed latch 2 writes identical to MAME in order through the boot and the coin command (11 s after the watchdog reset), max time offset 0.26 ms |
+| `... +PRE=ef,1f +SHIFTFROM=12000000 +SHIFTAT=500000 +MS=5500` (boot + coin commands, then MAME's commands from the game start on, moved to 0.5 s) + `audiocheck.py --mame-offset 14.5 --start 0.55` vs `mame -wavwrite` with the same inputs | gameplay music and effects 0.55-5.5 s: RMS ratio 1.00, 10 ms envelope correlation 0.908, log-spectrum correlation 0.957 |

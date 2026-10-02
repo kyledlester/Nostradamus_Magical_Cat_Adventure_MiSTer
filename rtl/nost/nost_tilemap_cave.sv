@@ -1,4 +1,4 @@
-// Nostradamus MiSTer core -- 038 tilemap line renderer using the Cave core's 038 layer processor.
+// LINDA board MiSTer core -- 038 tilemap line renderer using the Cave core's 038 layer processor.
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Alternative to nost_tilemap (OSD "Tilemap engine: Cave 038"), same interface. The 038 itself is
@@ -16,8 +16,8 @@
 //     spriteOffset_x = 0x194 - 0x12 and spriteOffset_y = 0x1DF - 0x1EE give MAME's nost origin
 //     (scroll - 0x194, scroll - 0x1DF); video size 0x101 / 0x1C1 reproduce MAME's flipped origin;
 //   * nost maps only the 16x16 tile RAM (tile size forced to 16x16), 4 bpp, pen 0 transparent;
-//   * colour bank (reg 2 bits 3-0, mcatadv get_banked_color) and the region's 0xC000-element code
-//     wrap (code % 0x3000) are applied outside the module, as in nost_tilemap.
+//   * colour bank (reg 2 bits 3-0, mcatadv get_banked_color) and the region's code wrap
+//     (code_wrap) are applied outside the module, as in nost_tilemap.
 // Row scroll / row select are computed by the module (row select replaces the line, row scroll adds
 // to x); the adapter supplies the line-RAM words at this board's indices (CAVE_LINE_INDEX below).
 module nost_tilemap_cave #(
@@ -35,6 +35,7 @@ module nost_tilemap_cave #(
 
     input  logic [47:0] regs0,          // {reg2, reg1, reg0} chip 0
     input  logic [47:0] regs1,
+    input  logic        mcat,           // game select (tile ROM sizes)
 
     output logic [11:0] vram_addr,      // word address in the chip's 0x2000-byte RAM (both chips)
     input  logic [15:0] vram0_q,
@@ -93,16 +94,24 @@ module nost_tilemap_cave #(
         .io_spriteOffset_x(9'h182), .io_spriteOffset_y(9'h1F1),
         .io_pen_priority(pen_pri), .io_pen_palette(pen_pal), .io_pen_color(pen_col));
 
-    function automatic [15:0] mod3000(input [15:0] c);      // c % 0x3000 (MAME code % elements)
-        logic [3:0] n, q3;
-        n  = c[15:12];
-        q3 = (n >= 4'd15) ? 4'd15 : (n >= 4'd12) ? 4'd12 : (n >= 4'd9) ? 4'd9 :
-             (n >= 4'd6)  ? 4'd6  : (n >= 4'd3)  ? 4'd3  : 4'd0;
-        mod3000 = {n - q3, c[11:0]};
+    // MAME draws 8x8 element code * 4 + q modulo the region's element count (gfx_element
+    // get_data): 16x16 code % (region bytes / 128). nost: bg0 / bg1 0x180000 -> % 0x3000;
+    // mcatadv: bg0 0x80000 -> % 0x1000, bg1 0x280000 -> % 0x5000.
+    function automatic [15:0] code_wrap(input [15:0] c, input mc, input lyr);
+        logic [3:0] n, q;
+        n = c[15:12];
+        if (!mc)
+            q = (n >= 4'd15) ? 4'd15 : (n >= 4'd12) ? 4'd12 : (n >= 4'd9) ? 4'd9 :
+                (n >= 4'd6)  ? 4'd6  : (n >= 4'd3)  ? 4'd3  : 4'd0;
+        else if (lyr)
+            q = (n >= 4'd15) ? 4'd15 : (n >= 4'd10) ? 4'd10 : (n >= 4'd5) ? 4'd5 : 4'd0;
+        else
+            q = n;
+        code_wrap = {n - q, c[11:0]};
     endfunction
     // ROM byte address: {code[15:0], y3, half, pair, 3'b000} (= MAME's 8x8 element code*4+q, row
     // pair); code wrapped as MAME
-    wire [15:0] rom_code = mod3000(m_rom_addr[22:7]);
+    wire [15:0] rom_code = code_wrap(m_rom_addr[22:7], mcat, layer);
     wire [25:0] rom_byte = {3'b000, rom_code, m_rom_addr[6:0]};
 
     assign busy = st != S_IDLE;
@@ -177,8 +186,8 @@ module nost_tilemap_cave #(
             S_ROM: begin
                 if (rom_cached == {1'b1, rom_byte}) st <= S_STEP;
                 else begin
-                    // SDRAM byte (layer ? 0x0E80000 : 0x0D00000) + rom_byte (MAME byte order copy)
-                    mem_addr <= (layer ? 25'h740000 : 25'h680000) + {1'b0, rom_byte[25:1]};
+                    // SDRAM byte (layer ? 0x1200000 : 0x1000000) + rom_byte (MAME byte order copy)
+                    mem_addr <= (layer ? 25'h900000 : 25'h800000) + {1'b0, rom_byte[25:1]};
                     mem_req  <= 1'b1;
                     st       <= S_FETCH;
                 end

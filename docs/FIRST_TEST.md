@@ -5,8 +5,8 @@
 | Item | Path / value |
 | --- | --- |
 | RBF | `Releases/Nostradamus_YYYYMMDD.rbf` (see the release commit) -> `/media/fat/_Arcade/cores/` |
-| MRA | `mra/Nostradamus.mra` -> `/media/fat/_Arcade/` |
-| ROM set | MAME 0.289 `nost.zip` (14 files; `mame -verifyroms nost` = good; non-merged or split both work, no clone files needed) -> `/media/fat/games/mame/` |
+| MRA | `mra/Nostradamus.mra`, `mra/Magical Cat Adventure.mra` -> `/media/fat/_Arcade/` |
+| ROM sets | MAME 0.289 `nost.zip` and `mcatadv.zip` (14 files each; `mame -verifyroms` = good; non-merged or split both work, no clone files needed) -> `/media/fat/games/mame/` |
 | Platform | DE10-Nano with a 32 MB SDRAM module (required: all graphics, sound and program ROMs are in SDRAM) |
 
 ## Procedure (one pass, ~10 minutes)
@@ -23,6 +23,18 @@
 6. Optional: OSD **DIP switches**: set *Service Mode* On, reset. Test screens appear; **Service** (R)
    cycles them (crosshatch, switch test, DIP display, sound test). Set it back to Off.
 7. Optional: OSD *Orientation* Horz on an analog 15 kHz CRT.
+
+### Magical Cat Adventure
+
+1. Load *Magical Cat Adventure*. Expect ~3 s of black (cold-boot watchdog wait), then the title.
+   The picture is horizontal (no rotation on HDMI; the OSD has no orientation items).
+2. The attract mode (title, demo play, high scores) is **silent in MAME too** - not a fault.
+3. Press **Coin** (Select), then **Start**: music should start with the game. Play stage 1: walk,
+   **Jump** (B), **Fire** (A); check the scrolling backgrounds and sprites.
+4. Optional: second controller; *Service Mode* DIP On and reset for the test screens (Button 3 = X
+   selects the object ROM check there).
+5. Optional: switch back to *Nostradamus* afterwards and check it still loads vertically (the game
+   select comes from each MRA).
 
 ## If something is wrong, please note
 

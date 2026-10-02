@@ -8,9 +8,10 @@
 //                            Z80's block-RAM copy of 0000-7FFF (nost_sound)
 //   140000-23FFFF adpcma   -> 0x0200000 + a'
 //   240000-3BFFFF bg0      -> 0x0400000 + row reorder (romtool gfx_row_perm)
-//   3C0000-53FFFF bg1      -> 0x0600000 + row reorder
+//   3C0000-53FFFF bg1      -> 0x0D00000 + row reorder
 //   540000-A3FFFF sprdata  -> 0x0800000 + a'
-// and a second copy of bg0 / bg1 in MAME byte order (no row reorder) at 0x0D00000 / 0x0E80000 for
+//   A40000-B3FFFF bg1 0x180000-0x27FFFF (Magical Cat only) -> 0x0E80000 + row reorder
+// and a second copy of bg0 / bg1 in MAME byte order (no row reorder) at 0x1000000 / 0x1200000 for
 // the Cave 038 engine (nost_tilemap_cave).
 // ioctl_wait is held from ioctl_wr until the SDRAM write of that word is done.
 module nost_loader (
@@ -33,7 +34,7 @@ module nost_loader (
     output logic [14:1] zfix_waddr,
     output logic [15:0] zfix_wdata,
 
-    output logic        loaded           // a complete stream has been received
+    output logic        loaded           // a stream download has completed
 );
     typedef enum logic [1:0] {IDLE, W1, W2, W3} st_t;
     st_t st;
@@ -41,6 +42,7 @@ module nost_loader (
     logic [15:0] d;
 
     wire sel = ioctl_download && ioctl_index == 16'd0;
+    logic sel_d;
 
     // 16x16 tile row reorder inside a 128-byte tile (byte offset o, even)
     function automatic [20:0] perm(input [20:0] o);
@@ -55,6 +57,8 @@ module nost_loader (
 
     always_ff @(posedge clk) begin
         zfix_we <= 1'b0;
+        sel_d   <= sel;
+        if (sel_d && !sel) loaded <= 1'b1;
         if (rst) begin
             st <= IDLE;
             mem_req <= 1'b0;
@@ -64,7 +68,6 @@ module nost_loader (
                 a  <= ioctl_addr;
                 d  <= ioctl_dout;
                 st <= W1;
-                if (ioctl_addr == 27'hA3FFFE) loaded <= 1'b1;
             end
             W1: begin
                 logic [25:0] b;                       // SDRAM byte address
@@ -72,14 +75,15 @@ module nost_loader (
                 else if (a < 27'h140000) b = 26'h0100000 + 26'(a - 27'h100000);
                 else if (a < 27'h240000) b = 26'h0200000 + 26'(a - 27'h140000);
                 else if (a < 27'h3C0000) b = 26'h0400000 + {5'd0, perm(21'(a - 27'h240000))};
-                else if (a < 27'h540000) b = 26'h0600000 + {5'd0, perm(21'(a - 27'h3C0000))};
-                else                     b = 26'h0800000 + 26'(a - 27'h540000);
+                else if (a < 27'h540000) b = 26'h0D00000 + {5'd0, perm(21'(a - 27'h3C0000))};
+                else if (a < 27'hA40000) b = 26'h0800000 + 26'(a - 27'h540000);
+                else                     b = 26'h0E80000 + {5'd0, perm(21'(a - 27'hA40000))};
                 if (a >= 27'h100000 && a < 27'h108000) begin
                     zfix_we    <= 1'b1;
                     zfix_waddr <= a[14:1];
                     zfix_wdata <= d;
                 end
-                if (a < 27'hA40000) begin
+                if (a < 27'hB40000) begin
                     mem_addr  <= b[25:1];
                     mem_wdata <= d;
                     mem_req   <= 1'b1;
@@ -90,9 +94,10 @@ module nost_loader (
             W2: if (mem_ack) begin
                 mem_req <= 1'b0;
                 st      <= IDLE;
-                if (a >= 27'h240000 && a < 27'h540000) begin           // bg copy for the Cave 038
-                    mem_addr <= (a < 27'h3C0000) ? 25'h680000 + 25'(a[24:1] - 24'h120000)
-                                                 : 25'h740000 + 25'(a[24:1] - 24'h1E0000);
+                if (a >= 27'h240000 && a < 27'h540000 || a >= 27'hA40000) begin  // bg copy, Cave 038
+                    mem_addr <= (a < 27'h3C0000) ? 25'h800000 + 25'(a[24:1] - 24'h120000) :
+                                (a < 27'h540000) ? 25'h900000 + 25'(a[24:1] - 24'h1E0000) :
+                                                   25'h9C0000 + 25'(a[24:1] - 24'h520000);
                     st <= W3;
                 end
             end

@@ -1,6 +1,7 @@
 //============================================================================
 //
-//  Nostradamus (Face, 1993) MiSTer core -- top level (emu).
+//  LINDA board MiSTer core -- Nostradamus (Face, 1993) and Magical Cat Adventure (Wintechno,
+//  1993) -- top level (emu).
 //
 //  This program is free software: you can redistribute it and/or modify it
 //  under the terms of the GNU General Public License as published by the Free
@@ -19,8 +20,10 @@
 // clk_sys 98.058240 MHz (nost_pll.sv); every emulated clock is a clock enable of it (the sound
 // board runs on clk_snd = clk_sys / 2). nost_core = ROM loader + 68000 board + video + Z80 sound
 // board (docs/ARCHITECTURE.md).
-// The game is vertical (MAME ROT270): HDMI uses the framework screen_rotate (DDR3 framebuffer,
-// counter-clockwise); native/analog output is the unrotated 15 kHz raster for a rotated CRT.
+// The MRA selects the game (ioctl index 1, nost_core). Nostradamus is vertical (MAME ROT270): HDMI
+// uses the framework screen_rotate (DDR3 framebuffer, counter-clockwise); native/analog output is
+// the unrotated 15 kHz raster for a rotated CRT. Magical Cat Adventure is horizontal (ROT0): no
+// rotation, and the orientation items are hidden.
 
 module emu
 (
@@ -48,9 +51,11 @@ assign LED_POWER = 0;
 assign LED_USER  = ioctl_download;
 assign BUTTONS   = 0;
 
+wire mcat;                           // game select from the MRA: Magical Cat Adventure
+
 // 320x224 raster shown on a 4:3 tube; rotated (portrait) it is 3:4.
 wire [1:0] ar = status[122:121];
-wire       landscape = no_rotate;
+wire       landscape = no_rotate;    // includes Magical Cat (horizontal)
 assign VIDEO_ARX = (!ar) ? (landscape ? 12'd4 : 12'd3) : (ar - 1'd1);
 assign VIDEO_ARY = (!ar) ? (landscape ? 12'd3 : 12'd4) : 12'd0;
 
@@ -59,8 +64,8 @@ localparam CONF_STR = {
 	"Nostradamus;;",
 	"-;",
 	"O[122:121],Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
-	"O[1],Orientation,Vert,Horz;",
-	"O[3],Rotate CCW/CW,CCW,CW;",
+	"H2O[1],Orientation,Vert,Horz;",
+	"H2O[3],Rotate CCW/CW,CCW,CW;",
 	"O[5],Flip screen (180),Off,On;",
 	"O[6],Tilemap engine,MAME-matched,Cave 038;",
 	"O[12:11],Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
@@ -113,7 +118,7 @@ hps_io #(.CONF_STR(CONF_STR), .WIDE(1)) hps_io
 	.video_rotated(video_rotated),
 	.buttons(buttons),
 	.status(status),
-	.status_menumask({14'd0, ~status[96], 1'b0}),   // H1 = CRT Adjust amounts, hidden while Off
+	.status_menumask({13'd0, mcat, ~status[96], 1'b0}),   // H1 = CRT Adjust amounts while Off, H2 = rotation (Magical Cat)
 	.joystick_0(joystick_0),
 	.joystick_1(joystick_1),
 	.ioctl_download(ioctl_download),
@@ -194,6 +199,7 @@ nost_core core
 	.hsync(hsync),
 	.vsync(vsync),
 	.vb_next(vb_next),
+	.mcat(mcat),
 	.snd(snd)
 );
 
@@ -288,7 +294,7 @@ nost_crt_adjust #(.SYS_HZ(98_058_240), .PIX_DIV(14), .HTOTAL(456), .VTOTAL(256))
 	.active()
 );
 
-wire no_rotate = status[1] | direct_video;
+wire no_rotate = status[1] | direct_video | mcat;
 wire rotate_ccw = ~status[3];
 wire flip = 1'b0;
 wire video_rotated;

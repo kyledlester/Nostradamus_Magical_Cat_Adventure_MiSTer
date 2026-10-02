@@ -1,5 +1,6 @@
--- MAME 0.289 Lua: snapshot of the nost 68000 board at the entry of the first IRQ1 handler of frame
--- NOST_SNAP (the first opcode fetch at the autovector-1 handler, 0x000898, after frame_done(NOST_SNAP)),
+-- MAME 0.289 Lua: snapshot of the nost / mcatadv 68000 board at the entry of the first IRQ1 handler
+-- of frame NOST_SNAP (the first opcode fetch at the autovector-1 handler, the vector at 0x64: nost
+-- 0x000898, mcatadv 0x000900, after frame_done(NOST_SNAP)),
 -- for sim/tb/tb_system.sv +SNAP (start the integrated simulation there instead of at reset).
 --   NOST_OUT    output directory
 --   NOST_SNAP   frame number
@@ -40,8 +41,12 @@ if _G.nost_snap_runs == 1 then
     end
     if fn == snap then armed = true end
   end)
-  _G.nost_tap = sp:install_read_tap(0x000898, 0x000899, "snap", function(off, data, mask)
+  local h1 = sp:read_u32(0x64)
+  _G.nost_tap = sp:install_read_tap(h1, h1 + 1, "snap", function(off, data, mask)
     if not armed or _G.nost_snap_done then return end
+    -- the handler's first fetch has the interrupt mask raised to 1; other code may also fetch this
+    -- address (mcatadv's gameplay loop does) with the mask at 0
+    if (cpu.state["SR"].value & 0x0700) ~= 0x0100 then return end
     _G.nost_snap_done = true
     local e = (FP - scr:time_until_pos(0, 0)) % FP
     local v = math.floor(e / SP + 1e-9)

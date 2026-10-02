@@ -17,6 +17,9 @@
 //   +INPUTS=<file> lines "<vblank> <joy0 hex> <joy1 hex>" (MiSTer joystick bits) applied at that vblank
 //   +DSW=<hex>    DIP word as the MRA sends it (index 254), default FFFF
 //   +AUDIO=<file> signed 16-bit mono at 48 kHz
+//   +MCAT         Magical Cat Adventure (game select byte 01 sent as the MRA does, ioctl index 1;
+//                 use with +SDRAM=local/mcatadv/sim/sdram_be.bin). +SKIPWD and +BOOTPATCH are
+//                 Nostradamus-only.
 // Writes <FRAMEDIR>/latch.txt ("frame line value" per 68000 sound-latch write) and prints counters.
 `timescale 1ns/1ps
 module tb_system;
@@ -42,6 +45,8 @@ module tb_system;
     logic ioctl_download = 0, ioctl_wr = 0;
     logic [15:0] ioctl_index = 0, ioctl_dout = 0;
     string sdram_img;
+    logic cave038 = 0;
+    initial if ($test$plusargs("CAVE038")) cave038 = 1;
 
     nost_core #(.SND_CE_NUM(SND_NUM), .SND_CE_DEN(SND_DEN)) dut (
         .clk(clk), .clk_snd(clk_snd), .init(init), .reset(reset), .pause(1'b0),
@@ -67,8 +72,6 @@ module tb_system;
         .wen(SDRAM_nWE), .ba(SDRAM_BA), .a(SDRAM_A), .dqml(SDRAM_DQML), .dqmh(SDRAM_DQMH), .dq(SDRAM_DQ));
 
     int max_frames = 40;
-    logic cave038 = 0;
-    initial if ($test$plusargs("CAVE038")) cave038 = 1;
     bit dump_want [int];
     // inputs
     int in_frame [$]; logic [31:0] in_joy0 [$], in_joy1 [$];
@@ -91,6 +94,7 @@ module tb_system;
     int lfd, afd = 0;
     string snap_dir;
     logic [31:0] snap_sp, snap_sr;
+    logic [23:0] snap_h1;
     logic [15:0] snap_tm [$], snap_vid [$], snap_ram [$];
     bit snap_frame_pending = 0;
 
@@ -153,6 +157,7 @@ module tb_system;
                     regs["D6"], regs["D7"], regs["A0"], regs["A1"], regs["A2"], regs["A3"], regs["A4"],
                     regs["A5"], regs["A6"], regs["SP"] + 32'd6};
             foreach (tab[i]) begin chip.mem[24'h078080 + 2 * i] = tab[i][31:16]; chip.mem[24'h078081 + 2 * i] = tab[i][15:0]; end
+            snap_h1 = {chip.mem[24'h000032][7:0], chip.mem[24'h000033]};      // IRQ1 handler (vector 0x64)
             chip.mem[24'h000000] = 16'h0011; chip.mem[24'h000001] = 16'h0000;   // SSP (overwritten)
             chip.mem[24'h000002] = 16'h000F; chip.mem[24'h000003] = 16'h0000;   // PC = stub
             snap_frame_pending = 1;
@@ -165,7 +170,7 @@ module tb_system;
             for (int i = 0; i < 3; i++) begin dut.main.tm0[i] = snap_tm[i]; dut.main.tm1[i] = snap_tm[i + 3]; end
             for (int i = 0; i < 8; i++) dut.main.vid[i] = snap_vid[i];
         end
-        if (snap_frame_pending && dut.main.cpu_ack && !dut.main.cpu_write && dut.main.a == 24'h000898) begin
+        if (snap_frame_pending && dut.main.cpu_ack && !dut.main.cpu_write && dut.main.a == snap_h1) begin
             // the CPU pushed its own frame at SP; restore MAME's (captured with the RAM)
             automatic int w = (snap_sp - 32'h100000) >> 1;
             snap_frame_pending = 0;
@@ -221,7 +226,10 @@ module tb_system;
             dut.main.ram.hi[15'h0F] = 8'h73; dut.main.ram.lo[15'h0F] = 8'h74;
         end
         repeat (8) @(posedge clk);
-        // DIP switches exactly as the MRA sends them: ioctl index 254, one word
+        // game select and DIP switches exactly as the MRA sends them: ioctl index 1 / 254
+        @(posedge clk); ioctl_download <= 1; ioctl_index <= 16'd1; ioctl_dout <= $test$plusargs("MCAT") ? 16'h0001 : 16'h0000; ioctl_wr <= 1;
+        @(posedge clk); ioctl_wr <= 0;
+        @(posedge clk); ioctl_download <= 0;
         @(posedge clk); ioctl_download <= 1; ioctl_index <= 16'd254; ioctl_dout <= dsw; ioctl_wr <= 1;
         @(posedge clk); ioctl_wr <= 0;
         @(posedge clk); ioctl_download <= 0;

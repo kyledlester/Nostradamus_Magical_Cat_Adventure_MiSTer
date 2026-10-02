@@ -54,7 +54,11 @@ module nost_rom_cache #(
 `ifdef NOST_SIM_ROM
     // simulation only: zero-wait program ROM (MAME timing) for the bus-trace comparison bench
     logic [15:0] simrom [0:524287];
-    initial $readmemh("local/sim/maincpu.hex", simrom);
+    initial begin
+        string f;
+        if (!$value$plusargs("ROMHEX=%s", f)) f = "local/sim/maincpu.hex";
+        $readmemh(f, simrom);
+    end
     assign hit  = lookup;
     assign q    = simrom[addr];
 `else

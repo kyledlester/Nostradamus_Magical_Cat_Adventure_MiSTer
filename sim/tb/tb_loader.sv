@@ -75,6 +75,7 @@ module tb_loader;
         $fclose(fd);
         repeat (64) @(posedge clk);
         dl <= 0;
+        repeat (4) @(posedge clk);              // loaded is set when the download ends
         $display("stream: %0d words, loaded flag %0d", n, loaded);
         // compare every image word with the chip model (word address = SDRAM byte address / 2)
         fd = $fopen(image, "rb");

@@ -54,6 +54,8 @@ module tb_render;
     logic [47:0] tm0r, tm1r;
     logic flip180 = 0, cave038 = 0;
     initial if ($test$plusargs("CAVE038")) cave038 = 1;
+    logic mcat = 0;                                           // +MCAT: Magical Cat Adventure
+    initial if ($test$plusargs("MCAT")) mcat = 1;
     initial if ($test$plusargs("FLIP180")) flip180 = 1;   // MAME pixels rotated 180 degrees are the reference
     logic [15:0] gx, gy;
     logic tm_req, sp_req, tm_ack, sp_ack;
@@ -64,7 +66,7 @@ module tb_render;
     logic [15:0] overruns, maxbusy;
     nost_video video (
         .clk(clk), .rst(rst), .ce_pix(ce_pix), .hcount(hc), .vcount(vc), .line_start(ls),
-        .hblank_in(hb), .vblank_in(vb), .hsync_in(hs), .vsync_in(vs), .flip180(flip180), .cave038(cave038),
+        .hblank_in(hb), .vblank_in(vb), .hsync_in(hs), .vsync_in(vs), .flip180(flip180), .cave038(cave038), .mcat(mcat),
         .tm0_regs(tm0r), .tm1_regs(tm1r), .spr_gx(gx), .spr_gy(gy),
         .vram_addr(vram_addr), .vram0_q(vram0_q), .vram1_q(vram1_q),
         .sbuf_addr(sbuf_addr), .sbuf_q(sbuf_q), .pal_addr(pal_addr), .pal_q(pal_q),
