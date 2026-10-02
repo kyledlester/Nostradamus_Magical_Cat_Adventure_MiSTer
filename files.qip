@@ -11,6 +11,8 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/nost/nost_main.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/nost/nost_loader.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/nost/nost_sdram_arb.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/nost/nost_tilemap.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/vendor/cave/CaveLayerProcessor.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/nost/nost_tilemap_cave.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/nost/nost_sprites.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/nost/nost_video.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/nost/nost_sound.sv

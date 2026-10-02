@@ -38,6 +38,7 @@ module nost_core #(
     input  logic        test_pattern,
     input  logic        dbg_overlay,
     input  logic        flip180,        // OSD Flip screen (180 degrees, independent of the game)
+    input  logic        cave038,        // OSD Tilemap engine: Cave 038 (rtl/nost/nost_tilemap_cave.sv)
 
     output logic        ce_pix,
     output logic [23:0] rgb,
@@ -139,7 +140,7 @@ module nost_core #(
     logic [15:0] dbg_overruns, dbg_maxbusy;
     nost_video video (
         .clk(clk), .rst(reset), .ce_pix(ce_pix), .hcount(hcount), .vcount(vcount), .line_start(line_start),
-        .hblank_in(hb), .vblank_in(vb), .hsync_in(hs), .vsync_in(vs), .flip180(flip180),
+        .hblank_in(hb), .vblank_in(vb), .hsync_in(hs), .vsync_in(vs), .flip180(flip180), .cave038(cave038),
         .tm0_regs(tm0_regs), .tm1_regs(tm1_regs), .spr_gx(spr_gx), .spr_gy(spr_gy),
         .vram_addr(vram_addr), .vram0_q(vram0_q), .vram1_q(vram1_q),
         .sbuf_addr(sbuf_addr), .sbuf_q(sbuf_q), .pal_addr(pal_addr), .pal_q(pal_q),

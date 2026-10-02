@@ -39,6 +39,10 @@ Player 2 uses the second controller.
 * **Orientation** Vert/Horz and **Rotate CCW/CW** (HDMI; the game is rotated counter-clockwise).
 * **DIP switches** (from the MRA, as MAME defines them): lives, difficulty, flip screen, demo
   sounds, bonus life, coin A/B, SW2:7 (unused), service mode.
+* **Flip screen (180)**: the core rotates the whole picture (15 kHz and HDMI), independent of the game.
+* **Tilemap engine**: *MAME-matched* (default, this project's 038 line renderer) or *Cave 038*
+  (the 038 layer processor from MiSTer-devel/Arcade-Cave_MiSTer, adapted to this board). Both are
+  pixel-exact against MAME on every captured frame; latched at reset / vblank.
 * **CRT Adjust**, **Scandoubler Fx**, **Pause** options, **Debug overlay**, **Video test pattern**.
 
 ## Video

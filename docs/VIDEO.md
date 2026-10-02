@@ -53,6 +53,23 @@ modulo the region's 0xC000 elements, i.e. code % 0x3000. Pen 0 is transparent. P
 to 12 bits. r2 bit 4 disables the layer. The game uses only the 16x16 tile RAM (MAME maps no 8x8
 RAM for this board), so register 1 bit 13 has no effect.
 
+### Cave 038 engine (OSD *Tilemap engine: Cave 038*)
+
+`rtl/nost/nost_tilemap_cave.sv` drives `rtl/vendor/cave/CaveLayerProcessor.sv` (Arcade-Cave_MiSTer,
+unmodified) as an alternative line renderer with the same interface. The module is raster-synchronous;
+the adapter steps it through x = -32..319 per line and layer, serving its tile RAM / line RAM / tile ROM
+addresses from board RAM and the MAME-order bg copies in SDRAM. Board adaptation is in the inputs only:
+
+* origin: `spriteOffset` 0x182 / 0x1F1 and video size 0x101 / 0x1C1 give MAME's scroll origins
+  (normal and flipped); colour bank and the code % 0x3000 wrap are applied outside the module;
+* line RAM: the module would read both words at (scrolled line - 1), which on this board shows the
+  row-selected background one line low and reads an entry the game never writes on line 0. The adapter
+  supplies row select from the scrolled line and row scroll from the selected line (as MAME), and,
+  with the 038 flipped, converts the row-select value (rowselect - 2y + 0x19E) because MAME applies the
+  flip after row select. Parameter `CAVE_LINE_INDEX = 1` restores the module's own lookup.
+
+Longest line ~4200 of 6384 clocks (the MAME-matched engine: ~2300).
+
 ## Sprites
 
 Entry (4 words): w0 = {priority[1:0], pen[5:0], flip X, flip Y, -}, w1 = tile, w2 = {width/16,
@@ -85,3 +102,4 @@ exactly what MAME does (25 flipped frames pixel-exact). The PCB's flipped pictur
 | --- | --- |
 | `refrender.py check` (Python spec vs MAME) | 101/101 attract frames (990-3990), 25/25 flipped frames pixel-exact |
 | `scripts/render_batch.sh` / `sim.sh render` (RTL engines + arbiter + sdram.sv + chip model vs MAME) | 8 attract + 3 flipped frames pixel-exact, no render overrun (busiest line 2561 of 6384 clocks) |
+| `RB_ARGS=+CAVE038 scripts/render_batch.sh` (Cave 038 engine) | 86/86 frames (9 attract incl. row scroll + row select, 6 gameplay, 71 consecutive 1490-1560) + 25/25 DIP-flipped + 2 OSD flip-180 pixel-exact, no overrun (busiest line 4204 of 6384) |

@@ -41,8 +41,11 @@ for it (pen 15 everywhere, as MAME's erased region).
 | 0x0400000-0x057FFFF | `bg0`, row-reordered |
 | 0x0600000-0x077FFFF | `bg1`, row-reordered |
 | 0x0800000-0x0CFFFFF | `sprdata` 0x000000-0x4FFFFF |
+| 0x0D00000-0x0E7FFFF | `bg0`, MAME byte order (second copy, written by the loader; read by the Cave 038 engine) |
+| 0x0E80000-0x0FFFFFF | `bg1`, MAME byte order (second copy) |
 
 Tilemap row reorder: a 16x16 tile (128 bytes, `code*4` + quadrant 8x8 tiles TL, TR, BL, BR, each
 `gfx_8x8x4_packed_msb` = 4 bytes per row, high nibble first) is stored as 16 rows of 8 bytes:
 row r = 4 bytes of TL/BL row r%8, then 4 bytes of TR/BR. One 4-word SDRAM burst = one 16-pixel
-tile row. Sprite data stays linear: one burst = 16 consecutive sprite pixels (low nibble first).
+tile row. The MAME-order copies are made by `nost_loader` from the same stream (the MRA is
+unchanged): the Cave 038 fetches 8 bytes = two 8-pixel rows of one 8x8 quadrant per access. Sprite data stays linear: one burst = 16 consecutive sprite pixels (low nibble first).

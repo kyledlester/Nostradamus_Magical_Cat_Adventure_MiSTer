@@ -10,6 +10,8 @@
 //   240000-3BFFFF bg0      -> 0x0400000 + row reorder (romtool gfx_row_perm)
 //   3C0000-53FFFF bg1      -> 0x0600000 + row reorder
 //   540000-A3FFFF sprdata  -> 0x0800000 + a'
+// and a second copy of bg0 / bg1 in MAME byte order (no row reorder) at 0x0D00000 / 0x0E80000 for
+// the Cave 038 engine (nost_tilemap_cave).
 // ioctl_wait is held from ioctl_wr until the SDRAM write of that word is done.
 module nost_loader (
     input  logic        clk,
@@ -33,7 +35,7 @@ module nost_loader (
 
     output logic        loaded           // a complete stream has been received
 );
-    typedef enum logic [1:0] {IDLE, W1, W2} st_t;
+    typedef enum logic [1:0] {IDLE, W1, W2, W3} st_t;
     st_t st;
     logic [26:0] a;
     logic [15:0] d;
@@ -88,6 +90,18 @@ module nost_loader (
             W2: if (mem_ack) begin
                 mem_req <= 1'b0;
                 st      <= IDLE;
+                if (a >= 27'h240000 && a < 27'h540000) begin           // bg copy for the Cave 038
+                    mem_addr <= (a < 27'h3C0000) ? 25'h680000 + 25'(a[24:1] - 24'h120000)
+                                                 : 25'h740000 + 25'(a[24:1] - 24'h1E0000);
+                    st <= W3;
+                end
+            end
+            W3: begin
+                if (!mem_req) mem_req <= 1'b1;
+                else if (mem_ack) begin
+                    mem_req <= 1'b0;
+                    st      <= IDLE;
+                end
             end
             default: st <= IDLE;
         endcase

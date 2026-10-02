@@ -22,6 +22,7 @@ module nost_video (
     input  logic         hsync_in,
     input  logic         vsync_in,
     input  logic         flip180,           // OSD "Flip screen": whole picture rotated 180 degrees
+    input  logic         cave038,           // OSD "Tilemap engine": 0 = nost_tilemap, 1 = Cave 038
 
     input  logic  [47:0] tm0_regs,
     input  logic  [47:0] tm1_regs,
@@ -61,6 +62,7 @@ module nost_video (
     logic [7:0] render_y;
     logic       render_half;          // line-buffer half = parity of the DISPLAY line
     logic       flip_f = 1'b0;        // flip180, changed only between frames
+    logic       cave_f = 1'b0;        // cave038, changed only between frames
     logic       tm_busy, sp_busy;
     logic [15:0] busy_cnt;
 
@@ -70,6 +72,7 @@ module nost_video (
         render_pend  <= 1'b0;
         if (rst) begin
             flip_f       <= flip180;
+            cave_f       <= cave038;
             dbg_overruns <= '0;
             dbg_max_busy <= '0;
             busy_cnt     <= '0;
@@ -90,23 +93,52 @@ module nost_video (
                 render_half <= next_line[0];
             end
             render_start <= render_pend;
-            if (line_start && vcount == 8'd224) flip_f <= flip180;
+            if (line_start && vcount == 8'd224) begin flip_f <= flip180; cave_f <= cave038; end
         end
     end
     wire wr_half = render_half;
     wire rd_half = vcount[0];
 
     // ------------------------------------------------------------------ engines
+    // two interchangeable 038 engines (same interface); the selected one renders, its outputs drive
+    // the line buffers, the board RAM read port and the SDRAM client
     logic        tlb_we, tlb_layer, ten_we, ten_data;
     logic [8:0]  tlb_x;
     logic [14:0] tlb_data;
+    logic        n_we, n_layer, n_enwe, n_en, n_req, n_busy;
+    logic [8:0]  n_x;
+    logic [14:0] n_data;
+    logic [11:0] n_vaddr;
+    logic [25:1] n_addr;
+    logic        c_we, c_layer, c_enwe, c_en, c_req, c_busy;
+    logic [8:0]  c_x;
+    logic [14:0] c_data;
+    logic [11:0] c_vaddr;
+    logic [25:1] c_addr;
     nost_tilemap tilemap (
-        .clk(clk), .rst(rst || abort), .start(render_start), .y(render_y), .busy(tm_busy),
+        .clk(clk), .rst(rst || abort), .start(render_start && !cave_f), .y(render_y), .busy(n_busy),
         .regs0(tm0_regs), .regs1(tm1_regs),
-        .vram_addr(vram_addr), .vram0_q(vram0_q), .vram1_q(vram1_q),
-        .mem_req(tm_req), .mem_addr(tm_addr), .mem_ack(tm_ack), .mem_data(mem_data),
-        .lb_we(tlb_we), .lb_layer(tlb_layer), .lb_x(tlb_x), .lb_data(tlb_data),
-        .en_we(ten_we), .en_data(ten_data));
+        .vram_addr(n_vaddr), .vram0_q(vram0_q), .vram1_q(vram1_q),
+        .mem_req(n_req), .mem_addr(n_addr), .mem_ack(tm_ack && !cave_f), .mem_data(mem_data),
+        .lb_we(n_we), .lb_layer(n_layer), .lb_x(n_x), .lb_data(n_data),
+        .en_we(n_enwe), .en_data(n_en));
+    nost_tilemap_cave tilemap_cave (
+        .clk(clk), .rst(rst || abort), .start(render_start && cave_f), .y(render_y), .busy(c_busy),
+        .regs0(tm0_regs), .regs1(tm1_regs),
+        .vram_addr(c_vaddr), .vram0_q(vram0_q), .vram1_q(vram1_q),
+        .mem_req(c_req), .mem_addr(c_addr), .mem_ack(tm_ack && cave_f), .mem_data(mem_data),
+        .lb_we(c_we), .lb_layer(c_layer), .lb_x(c_x), .lb_data(c_data),
+        .en_we(c_enwe), .en_data(c_en));
+    assign tm_busy   = n_busy || c_busy;
+    assign tm_req    = cave_f ? c_req   : n_req;
+    assign tm_addr   = cave_f ? c_addr  : n_addr;
+    assign vram_addr = cave_f ? c_vaddr : n_vaddr;
+    assign tlb_we    = cave_f ? c_we    : n_we;
+    assign tlb_layer = cave_f ? c_layer : n_layer;
+    assign tlb_x     = cave_f ? c_x     : n_x;
+    assign tlb_data  = cave_f ? c_data  : n_data;
+    assign ten_we    = cave_f ? c_enwe  : n_enwe;
+    assign ten_data  = cave_f ? c_en    : n_en;
 
     logic [1:0]  slb_we;
     logic [7:0]  slb_addr [2];

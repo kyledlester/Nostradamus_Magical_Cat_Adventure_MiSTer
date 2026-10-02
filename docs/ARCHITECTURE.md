@@ -4,7 +4,7 @@
                  clk_sys 98.058240 MHz (nost_pll) - main board and video are clock enables of it
  HPS ioctl ──► nost_loader ──► nost_sdram_arb ◄── 68000 ROM cache (nost_rom_cache, in nost_main)
                                   ▲   ▲   ▲     ◄── ADPCM-A / Z80 ROM line caches (nost_sound)
-                                  │   │   └──── ◄── nost_tilemap (038 x2, one engine)
+                                  │   │   └──── ◄── nost_tilemap or nost_tilemap_cave (038 x2, OSD)
                                   │   └──────── ◄── nost_sprites
                              sdram.sv (ch1, 4-word bursts) ─── SDRAM 32 MB
  nost_main (FX68K 16 MHz, BRAM work/tile/palette/sprite RAM, I/O, IRQ1, watchdog, sprite-half copy)

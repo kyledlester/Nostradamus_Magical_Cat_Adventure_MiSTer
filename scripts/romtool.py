@@ -78,7 +78,9 @@ STREAM_LEN = 0xA40000
 # 8 bytes (two 8x8 tiles side by side), see gfx_row_perm().
 SDRAM_BASE = {"maincpu": 0x0000000, "soundcpu": 0x0100000, "adpcma": 0x0200000,
               "bg0": 0x0400000, "bg1": 0x0600000, "sprdata": 0x0800000}
-SDRAM_LEN = 0x0D00000
+SDRAM_LEN = 0x1000000
+# second copy of bg0 / bg1 in MAME byte order for the Cave 038 engine (rtl/nost/nost_tilemap_cave.sv)
+SDRAM_CAVE_BG = {"bg0": 0x0D00000, "bg1": 0x0E80000}
 
 
 def gfx_row_perm(o):
@@ -158,6 +160,9 @@ def build_sdram(regs):
                 out[p:p + 2] = chunk[o:o + 2]
             chunk = bytes(out)
         mem[base:base + length] = chunk
+        if name in SDRAM_CAVE_BG:
+            c = SDRAM_CAVE_BG[name]
+            mem[c:c + length] = stream[soff:soff + length]
     return mem
 
 

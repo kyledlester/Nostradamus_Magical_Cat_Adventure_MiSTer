@@ -14,10 +14,12 @@ terms (`LICENSE.MiSTer`, GPL-2.0-or-later). All reused components are GPL-compat
 | Pause | `rtl/vendor/pause.v` | JimmyStones/Pause_MiSTer via Arcade-Pacman_MiSTer | SHA-1 `d5a5effd1bf91ae788436639bae3c63b8fe40347` | Jim Gregory | GPL-3.0-or-later | none |
 | 68000 bus glue | `rtl/nost/nost_cpu68k.sv`, `nost_cpu_bus.sv` | owner's NA-1/NA-2 core via R-Shark | - | owner | GPL-3.0-or-later | module names |
 | CRT Adjust glue, RAM primitives, SDRAM arbiter, overlay, loader/clock patterns | `rtl/nost/nost_crt_adjust.sv`, `nost_ram.sv`, `nost_sdram_arb.sv`, `nost_overlay.sv` | owner's R-Shark core | `207ae0e` | owner | GPL-3.0-or-later | renamed; arbiter generalized to 6 clients; overlay for 320x224 |
+| Cave 038 layer processor | `rtl/vendor/cave/CaveLayerProcessor.sv` (+ `LICENSE`) | MiSTer-devel/Arcade-Cave_MiSTer `rtl/cave/` | `ee191eab9f92c8946258c606363f1980ce138925` | Josh Bassett (nullobject) | GPL-3.0-or-later | none; adapted to this board by `rtl/nost/nost_tilemap_cave.sv` (OSD option) |
 | SDRAM chip model (sim) | `sim/models/sdr_sdram_model.sv` | owner's Neratte Chu core | - | owner | GPL-3.0-or-later | `preload` task added |
 
 Everything under `rtl/nost/` not listed above, the testbenches, the MAME Lua scripts and the
-Python tools were written for this project. The 038 tilemap engine, the FX1037-style sprite engine and the board logic follow MAME's
+Python tools were written for this project. Of the Cave core's chips only the 038 is shared with this
+board (68000 = FX68K and Z80 = T80 already; the Cave sound chips and sprite hardware differ). The default 038 tilemap engine, the FX1037-style sprite engine and the board logic follow MAME's
 behaviour; no existing FPGA implementation of this board was used.
 
 MAME (BSD-3-Clause / GPL-2.0+) is used only as a reference: no MAME code is included.

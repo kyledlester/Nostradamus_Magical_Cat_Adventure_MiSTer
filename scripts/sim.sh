@@ -24,7 +24,7 @@ JT10=$(ls rtl/vendor/jt10/*.v | tr '\n' ' ')
 N=rtl/nost
 MAIN="$N/nost_ram.sv $N/nost_cpu_bus.sv $N/nost_cpu68k.sv $N/nost_rom_cache.sv $N/nost_main.sv"
 CLK="$N/nost_clocks.sv $N/nost_video_timing.sv"
-VIDEO="$N/nost_tilemap.sv $N/nost_sprites.sv $N/nost_video.sv"
+VIDEO="$N/nost_tilemap.sv rtl/vendor/cave/CaveLayerProcessor.sv $N/nost_tilemap_cave.sv $N/nost_sprites.sv $N/nost_video.sv"
 SOUND="$N/nost_sound.sv"
 
 # test -> "top|vhdl files|fx68k?|vlog defines|sv files"

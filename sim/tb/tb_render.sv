@@ -52,7 +52,8 @@ module tb_render;
 
     // ------------------------------------------------------------------ DUT
     logic [47:0] tm0r, tm1r;
-    logic flip180 = 0;
+    logic flip180 = 0, cave038 = 0;
+    initial if ($test$plusargs("CAVE038")) cave038 = 1;
     initial if ($test$plusargs("FLIP180")) flip180 = 1;   // MAME pixels rotated 180 degrees are the reference
     logic [15:0] gx, gy;
     logic tm_req, sp_req, tm_ack, sp_ack;
@@ -63,7 +64,7 @@ module tb_render;
     logic [15:0] overruns, maxbusy;
     nost_video video (
         .clk(clk), .rst(rst), .ce_pix(ce_pix), .hcount(hc), .vcount(vc), .line_start(ls),
-        .hblank_in(hb), .vblank_in(vb), .hsync_in(hs), .vsync_in(vs), .flip180(flip180),
+        .hblank_in(hb), .vblank_in(vb), .hsync_in(hs), .vsync_in(vs), .flip180(flip180), .cave038(cave038),
         .tm0_regs(tm0r), .tm1_regs(tm1r), .spr_gx(gx), .spr_gy(gy),
         .vram_addr(vram_addr), .vram0_q(vram0_q), .vram1_q(vram1_q),
         .sbuf_addr(sbuf_addr), .sbuf_q(sbuf_q), .pal_addr(pal_addr), .pal_q(pal_q),
@@ -123,6 +124,11 @@ module tb_render;
         void'($fread(mame_px, fd));
         $fclose(fd);
         chip.preload(sdram_img);
+        // FPGA power-up zeros for the Cave 038's unreset registers (simulation only; the vendored
+        // module has no reset, so its first lead-in addresses would be X in the simulator)
+        video.tilemap_cave.l038.tileReg_code = '0; video.tilemap_cave.l038.tileReg_priority = '0;
+        video.tilemap_cave.l038.tileReg_colorCode = '0; video.tilemap_cave.l038.lineEffectReg_rowSelect = '0;
+        video.tilemap_cave.l038.lineEffectReg_rowScroll = '0;
         repeat (4) @(posedge clk);
         init <= 0;
         // let the SDRAM controller initialise (startup ~12100 clocks) before the first render line

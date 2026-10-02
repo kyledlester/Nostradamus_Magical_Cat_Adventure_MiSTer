@@ -49,7 +49,7 @@ module tb_system;
         .ioctl_dout(ioctl_dout), .ioctl_wait(ioctl_wait),
         .sd_addr(sd_addr), .sd_din(sd_din), .sd_be(sd_be), .sd_req(sd_req), .sd_rnw(sd_rnw),
         .sd_dout(sd_dout), .sd_ready(sd_ready),
-        .joy0(joy0), .joy1(joy1), .test_pattern(1'b0), .dbg_overlay(1'b0),
+        .joy0(joy0), .joy1(joy1), .test_pattern(1'b0), .dbg_overlay(1'b0), .flip180(1'b0), .cave038(cave038),
         .ce_pix(ce_pix), .rgb(rgb), .hblank(hb), .vblank(vb), .hsync(hs), .vsync(vs), .snd(snd));
 
     wire [15:0] SDRAM_DQ; wire [12:0] SDRAM_A; wire [1:0] SDRAM_BA;
@@ -67,6 +67,8 @@ module tb_system;
         .wen(SDRAM_nWE), .ba(SDRAM_BA), .a(SDRAM_A), .dqml(SDRAM_DQML), .dqmh(SDRAM_DQMH), .dq(SDRAM_DQ));
 
     int max_frames = 40;
+    logic cave038 = 0;
+    initial if ($test$plusargs("CAVE038")) cave038 = 1;
     bit dump_want [int];
     // inputs
     int in_frame [$]; logic [31:0] in_joy0 [$], in_joy1 [$];

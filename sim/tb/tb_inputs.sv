@@ -22,7 +22,7 @@ module tb_inputs;
         .ioctl_dout(ioctl_dout), .ioctl_wait(iow),
         .sd_addr(sd_addr), .sd_din(sd_din), .sd_be(sd_be), .sd_req(sd_req), .sd_rnw(sd_rnw),
         .sd_dout(sd_dout), .sd_ready(1'b0),
-        .joy0(joy0), .joy1(joy1), .test_pattern(1'b0), .dbg_overlay(1'b0),
+        .joy0(joy0), .joy1(joy1), .test_pattern(1'b0), .dbg_overlay(1'b0), .flip180(1'b0), .cave038(1'b0),
         .ce_pix(ce_pix), .rgb(rgb), .hblank(hb), .vblank(vb), .hsync(hs), .vsync(vs), .snd(snd));
 
     int errors = 0, checks = 0;
