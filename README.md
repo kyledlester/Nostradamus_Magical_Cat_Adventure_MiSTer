@@ -9,18 +9,22 @@ the MRA selects the game.
 | Game | MAME set | MRA | Status |
 | --- | --- | --- | --- |
 | Nostradamus | `nost` | `mra/Nostradamus.mra` | verified in simulation against MAME 0.289; **not yet tested on hardware** |
+| Nostradamus (Japan) | `nostj` | `mra/Nostradamus (Japan).mra` | as `nost` (simulation) |
+| Nostradamus Yeeon (Korea) | `nostk` | `mra/Nostradamus Yeeon (Korea).mra` | as `nost` (simulation) |
 | Magical Cat Adventure | `mcatadv` | `mra/Magical Cat Adventure.mra` | verified in simulation against MAME 0.289; **not yet tested on hardware** |
+| Magical Cat Adventure (Japan) | `mcatadvj` | `mra/Magical Cat Adventure (Japan).mra` | as `mcatadv` (simulation) |
+| Catt (Japan) | `catt` | `mra/Catt (Japan).mra` | as `mcatadv` (simulation) |
 
-ROMs are not included. Supply your own `nost.zip` / `mcatadv.zip` (MAME 0.289 sets;
-`mame -verifyroms nost mcatadv` = good). The clones `nostj`, `nostk`, `mcatadvj` and `catt` have
-no MRA yet.
+ROMs are not included. Supply your own MAME 0.289 sets (`mame -verifyroms` = good). The clone
+MRAs read split sets: the clone zip plus its parent's (`nostj.zip` + `nost.zip`,
+`mcatadvj.zip` / `catt.zip` + `mcatadv.zip`), as MAME's split sets are distributed.
 
 ## Installation
 
 1. Copy `Releases/Nostradamus_YYYYMMDD.rbf` to `/media/fat/_Arcade/cores/`.
 2. Copy the `.mra` files from `mra/` to `/media/fat/_Arcade/`.
-3. Copy `nost.zip` and/or `mcatadv.zip` to `/media/fat/games/mame/`.
-4. Load *Nostradamus* or *Magical Cat Adventure* from the Arcade menu.
+3. Copy the zips (`nost.zip`, `mcatadv.zip` and any clone zips) to `/media/fat/games/mame/`.
+4. Load a game from the Arcade menu.
 
 Both games start with a black screen for 3 s: on a cold start the program writes a signature to
 RAM and waits for a watchdog reset (see below). Nostradamus then runs about 13 s of self tests

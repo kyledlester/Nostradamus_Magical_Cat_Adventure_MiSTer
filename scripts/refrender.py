@@ -7,13 +7,13 @@ RTL video path is checked against.
   refrender.py png    <frame dir> <out.png>   write the reference image
   refrender.py index  <frame dir> <out.bin>   write the 320x224 palette-index image (u16 LE)
 
-Needs local/regions/{bg0,bg1,sprdata}.bin (romtool.py regions).
+Needs local/regions/{bg0,bg1,sprdata}.bin (romtool.py regions), or $NOST_REGDIR for another set.
 """
 import os, sys
 import numpy as np
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-REG = os.path.join(ROOT, "local", "regions")
+REG = os.environ.get("NOST_REGDIR", os.path.join(ROOT, "local", "regions"))   # e.g. local/catt/regions
 W, H = 320, 224
 
 _cache = {}

@@ -12,7 +12,8 @@ Reference: MAME 0.289 src/mame/misc/mcatadv.cpp ROM_START( nost ) / ROM_START( m
   romtool.py mra      [--game G] [--out FILE]         write the MRA
   romtool.py mracheck [--game G] [--zip Z] [--mra F]  rebuild the stream by interpreting the MRA
 
---game nost (default) or mcatadv. Default zip: C:/Users/klest/Downloads/mame/roms/<set>.zip.
+--game nost (default), nostj, nostk, mcatadv, mcatadvj or catt (clones: split zips, parent zip
+read too). Default zip: C:/Users/klest/Downloads/mame/roms/<set>.zip.
 Default output dir: local/ (nost) or local/mcatadv/ (mcatadv).
 """
 import argparse, os, sys, zipfile, zlib, xml.etree.ElementTree as ET
@@ -123,6 +124,45 @@ COMMON_STREAM = [
     ("bg1",      0x3C0000, 0x180000, "bg1",      0, "bytes"),
     ("sprdata",  0x540000, 0x500000, "sprdata",  0, "bytes"),   # 500000-7FFFFF = FF, not sent
 ]
+
+
+# Clones (MAME 0.289 ROM_START( nostj / nostk / mcatadvj / catt )): the parent's game data with
+# some ROMs replaced. Split ROM sets: the clone zip holds only the replaced ROMs, the MRA also
+# names the parent zip. A replacement ROM whose CRC equals the parent's keeps the parent's file
+# name (nostj's nos-pe-j.u30 is nos-pe-u.bin). (old name -> new name, size, crc); new regions.
+def _clone(parent, title, mod, roms, regions=None, buttons=None):
+    import copy
+    g = copy.deepcopy(GAMES[parent])
+    g["parent"], g["title"], g["mod"] = parent, title, mod
+    for old, (new, size, crc) in roms.items():
+        del g["roms"][old]
+        g["roms"][new] = (size, crc)
+        for name, (rsize, fill, loads) in g["regions"].items():
+            g["regions"][name] = (rsize, fill, [(new if r == old else r, o, k) for r, o, k in loads])
+    for name, reg in (regions or {}).items():
+        g["regions"][name] = reg
+    return g
+
+
+GAMES["nostj"] = _clone("nost", "Nostradamus (Japan)", 0x00, {
+    "nos-po-u.bin": ("nos-po-j.u29", 0x80000, 0x7fe241de)})
+GAMES["nostk"] = _clone("nost", "Nostradamus Yeeon (Korea)", 0x00, {
+    "nos-pe-u.bin": ("nos-pe-t.u30", 0x80000, 0xbee5fbc8),
+    "nos-po-u.bin": ("nos-po-t.u29", 0x80000, 0xf4736331)})
+GAMES["mcatadvj"] = _clone("mcatadv", "Magical Cat Adventure (Japan)", 0x01, {
+    "mca-u30e": ("u30.bin", 0x80000, 0x05762f42), "mca-u29e": ("u29.bin", 0x80000, 0x4c59d648),
+    "mca-u86e": ("u86.bin", 0x80000, 0x2d3725ed), "mca-u87e": ("u87.bin", 0x80000, 0x4ddefe08),
+    "mca-u100": ("u100.bin", 0x80000, 0xe2c311da)})
+# catt: 1 MB u84/u85, 1 MB ADPCM-A ROM, 1 MB bg0. Its bg0 ROM (u58.bin) is two identical copies of
+# mcatadv's 512 KB bg0 (checked), so MAME's code % 0x2000 fetches the same pixels as the core's
+# mcatadv code % 0x1000: same game byte as mcatadv.
+GAMES["catt"] = _clone("mcatadv", "Catt (Japan)", 0x01, {
+    "mca-u30e": ("catt-u30.bin", 0x80000, 0x8c921e1e), "mca-u29e": ("catt-u29.bin", 0x80000, 0xe725af6d),
+    "mca-u84.bin": ("u84.bin", 0x100000, 0x843fd624), "mca-u85.bin": ("u85.bin", 0x100000, 0x5ee7b628),
+    "mca-u58.bin": ("u58.bin", 0x100000, 0x73c9343a), "mca-u53.bin": ("u53.bin", 0x100000, 0x99f2a624)},
+    regions={"bg0": (0x100000, 0x00, [("u58.bin", 0, "load")]),
+             "adpcma": (0x100000, 0x00, [("u53.bin", 0, "load")])})
+
 # MAME region tags (for the Lua dump comparison)
 MAME_TAG = {"maincpu": "maincpu", "soundcpu": "soundcpu", "sprdata": "sprdata",
             "bg0": "bg0", "bg1": "bg1", "adpcma": "ymsnd:adpcma"}
@@ -153,16 +193,36 @@ def gfx_row_perm(o):
     return (o & ~0x7F) | (r << 3) | ((q & 1) << 2) | b
 
 
-def load_zip(game, path):
-    if not os.path.exists(path):
-        raise SystemExit(f"missing {path}")
-    z = zipfile.ZipFile(path)
-    names = {i.filename.lower(): i.filename for i in z.infolist()}
+def zips_of(game):
+    """the set's zip, then its parent's (split sets)"""
+    g = GAMES[game]
+    return [f"{game}.zip"] + ([f"{g['parent']}.zip"] if "parent" in g else [])
+
+
+def load_zip(game, paths):
+    """ROMs by name, else by CRC, from the given zips in order (as MiSTer resolves an MRA part)."""
+    zs = []
+    for path in paths:
+        if not os.path.exists(path):
+            raise SystemExit(f"missing {path}")
+        zs.append(zipfile.ZipFile(path))
     data = {}
-    for n in GAMES[game]["roms"]:
-        if n.lower() not in names:
-            raise SystemExit(f"missing {n} in {path}")
-        data[n] = z.read(names[n.lower()])
+    for n, (size, crc) in GAMES[game]["roms"].items():
+        hit = None
+        for z in zs:
+            for i in z.infolist():
+                if i.filename.lower() == n.lower():
+                    hit = (z, i); break
+            if hit: break
+        if not hit:
+            for z in zs:
+                for i in z.infolist():
+                    if i.CRC == crc and i.file_size == size:
+                        hit = (z, i); break
+                if hit: break
+        if not hit:
+            raise SystemExit(f"missing {n} (crc {crc:08x}) in {', '.join(paths)}")
+        data[n] = hit[0].read(hit[1])
     return data
 
 
@@ -307,7 +367,7 @@ def make_mra(game):
         a(f"    {soff:06X}-{soff + length - 1:06X}  {name:9s} MAME region '{MAME_TAG[src]}' from {roff:#x} "
           f"({'68000 words' if kind == 'be16' else 'bytes in order'}{pad})")
     a("  sprdata 500000-7FFFFF (MAME ROMREGION_ERASEFF, no ROMs) is not sent: the core returns FF.")
-    a(f"  ioctl index 1: game select byte {g['mod']:02X}.")
+    a(f"  ioctl index 1: game select byte {g['mod']:02X} (00 = Nostradamus board, 01 = Magical Cat board).")
     a("")
     a("  DIP switches (index 254): byte 0 = DSW1 (SW1:1-8 = bits 0-7), byte 1 = DSW2 (SW2:1-8),")
     a("  MAME port values (active low). Default FF,FF = MAME defaults.")
@@ -331,7 +391,7 @@ def make_mra(game):
     a("    </switches>")
     a("")
     a(f'    <rom index="1"><part>{g["mod"]:02X}</part></rom>')
-    a(f'    <rom index="0" zip="{game}.zip" md5="None">')
+    a(f'    <rom index="0" zip="{"|".join(zips_of(game))}" md5="None">')
     for name, soff, length, src, roff, kind in stream_of(game):
         a(f"        <!-- {soff:06X} {name} -->")
         for line in mra_segments(game, src, roff, length, kind):
@@ -381,7 +441,7 @@ def interpret_mra(mra_path, data):
     return streams
 
 
-MRA_FILE = {"nost": "Nostradamus.mra", "mcatadv": "Magical Cat Adventure.mra"}
+MRA_FILE = {g: GAMES[g]["title"] + ".mra" for g in GAMES}
 
 
 def main():
@@ -400,7 +460,7 @@ def main():
         open(path, "w", newline="\n").write(make_mra(game))
         print("wrote", path)
         return 0
-    data = load_zip(game, a.zip or os.path.join(ROMDIR, f"{game}.zip"))
+    data = load_zip(game, [a.zip] if a.zip else [os.path.join(ROMDIR, z) for z in zips_of(game)])
     out = a.out or os.path.join(ROOT, "local", *([] if game == "nost" else [game]))
     os.makedirs(out, exist_ok=True)
     if a.cmd == "verify":

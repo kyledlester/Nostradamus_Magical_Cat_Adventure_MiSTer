@@ -34,5 +34,7 @@ Deviations from MAME that are deliberate or understood, and PCB facts that are u
     PORT_CONDITION); the MRA lists both readings per setting ("Mode 1/Mode 2"). The coin counter /
     lockout write at 0x900000 is ignored (MAME leaves it unmapped too). Its game-select byte comes
     from the MRA (ioctl index 1); without it (an old MRA) the core runs as Nostradamus.
-12. **Clones.** `nostj`, `nostk`, `mcatadvj` and `catt` use the same hardware in MAME but have no
-    MRA yet (`catt` also has a 1 MB `bg0` and ADPCM-A ROM, which fit the slots).
+12. **Clones.** `nostj`, `nostk`, `mcatadvj` and `catt` have MRAs (split sets: clone zip + parent
+    zip). They were checked in simulation for ROM regions, boot and attract frames, not for long
+    sound or whole-board runs (their sound ROMs and hardware equal the parents'; `catt` has its own
+    ADPCM-A samples). `catt`'s PLD dumps (not used) are missing in MAME too.

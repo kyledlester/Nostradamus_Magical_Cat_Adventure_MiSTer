@@ -15,7 +15,16 @@ Source of truth: MAME 0.289 `ROM_START( nost )` and `ROM_START( mcatadv )`
 | `bg1` | 0x180000: `nos-b1-0.u60` + `nos-b1-1.u61` | 0x280000: `mca-u60.bin` + `mca-u61.bin` + `mca-u100` |
 | `ymsnd:adpcma` | 0x100000: `nossn-00.u53` | 0x080000: `mca-u53.bin` |
 
-0x500000-0x7FFFFF of `sprdata` is unpopulated in both games. Verification: `romtool.py regions`
+Clones (MAME `ROM_START`, split sets: the clone zip holds the replaced ROMs, the parent zip the
+rest): `nostj` replaces `nos-po-u.bin` with `nos-po-j.u29` (its `nos-pe-j.u30` has the same CRC as
+`nos-pe-u.bin`); `nostk` replaces both program ROMs (`nos-pe-t.u30`, `nos-po-t.u29`); `mcatadvj`
+replaces the program ROMs (`u30.bin`, `u29.bin`), `u86.bin` / `u87.bin` (sprites) and `u100.bin`
+(bg1); `catt` replaces the program ROMs (`catt-u30.bin`, `catt-u29.bin`), `u84.bin` / `u85.bin`
+(1 MB each, sprites 0x200000-0x3FFFFF), `u58.bin` (bg0, 0x100000) and `u53.bin` (ADPCM-A,
+0x100000). All fit the same slots. `catt`'s 1 MB `u58.bin` is two identical copies of `mcatadv`'s
+512 KB bg0 (checked), so MAME's bg0 code wrap 0x2000 gives the same pixels as the core's 0x1000.
+
+0x500000-0x7FFFFF of `sprdata` is unpopulated in all sets. Verification: `romtool.py regions`
 == `scripts/mame/dump_regions.lua` output for all six regions of both games, byte for byte
 (including the 0xFF fill of `sprdata`).
 
@@ -25,7 +34,8 @@ code modulo region bytes / 128: `nost` 0x3000 for both layers, `mcatadv` 0x1000 
 
 ## ioctl streams
 
-Index 1 (one byte, game select): 00 = Nostradamus, 01 = Magical Cat Adventure.
+Index 1 (one byte, game select): 00 = Nostradamus board (`nost`, `nostj`, `nostk`), 01 = Magical
+Cat board (`mcatadv`, `mcatadvj`, `catt`).
 
 Index 0 (hps_io WIDE=1). Both games use the same slots; a region smaller than its slot is padded
 (MRA `repeat` part) with the region's fill (0, or 0xFF for `sprdata` where MAME's erased region
