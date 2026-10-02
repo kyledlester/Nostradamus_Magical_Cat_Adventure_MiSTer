@@ -67,7 +67,7 @@ localparam CONF_STR = {
 	"H2O[1],Orientation,Vert,Horz;",
 	"H2O[3],Rotate CCW/CW,CCW,CW;",
 	"O[5],Flip screen (180),Off,On;",
-	"O[6],Tilemap engine,MAME-matched,Cave 038;",
+	"O[6],Tilemap engine,Cave 038,MAME-matched;",
 	"O[12:11],Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
 	"-;",
 	"DIP;",
@@ -191,7 +191,7 @@ nost_core core
 	.test_pattern(status[4]),
 	.dbg_overlay(status[2]),
 	.flip180(status[5]),
-	.cave038(status[6]),
+	.cave038(~status[6]),          // default (0) = Cave 038
 	.ce_pix(ce_pix),
 	.rgb(rgb),
 	.hblank(hblank),

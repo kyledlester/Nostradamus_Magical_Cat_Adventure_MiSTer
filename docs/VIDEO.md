@@ -54,7 +54,7 @@ modulo the region's element count, i.e. code % 0x3000 (Nostradamus, both layers)
 to 12 bits. r2 bit 4 disables the layer. The game uses only the 16x16 tile RAM (MAME maps no 8x8
 RAM for this board), so register 1 bit 13 has no effect.
 
-### Cave 038 engine (OSD *Tilemap engine: Cave 038*)
+### Cave 038 engine (OSD *Tilemap engine: Cave 038*, the default)
 
 `rtl/nost/nost_tilemap_cave.sv` drives `rtl/vendor/cave/CaveLayerProcessor.sv` (Arcade-Cave_MiSTer,
 unmodified) as an alternative line renderer with the same interface. The module is raster-synchronous;

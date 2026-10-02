@@ -19,7 +19,7 @@ terms (`LICENSE.MiSTer`, GPL-2.0-or-later). All reused components are GPL-compat
 
 Everything under `rtl/nost/` not listed above, the testbenches, the MAME Lua scripts and the
 Python tools were written for this project. Of the Cave core's chips only the 038 is shared with this
-board (68000 = FX68K and Z80 = T80 already; the Cave sound chips and sprite hardware differ). The default 038 tilemap engine, the FX1037-style sprite engine and the board logic follow MAME's
+board (68000 = FX68K and Z80 = T80 already; the Cave sound chips and sprite hardware differ). The project's own 038 tilemap engine (OSD *MAME-matched*), the FX1037-style sprite engine and the board logic follow MAME's
 behaviour; no existing FPGA implementation of this board was used.
 
 MAME (BSD-3-Clause / GPL-2.0+) is used only as a reference: no MAME code is included.
