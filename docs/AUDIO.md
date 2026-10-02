@@ -41,8 +41,9 @@ The FM/ADPCM balance inside jt10 follows the chip (jt10's own accumulator); MAME
 
 ## Timing differences against MAME
 
-* The Z80 program ROM is in SDRAM; a cache miss holds WAIT_n for ~0.5 us (MAME: no waits). The
-  4 KB cache keeps misses rare after start-up.
+* Z80 0000-7FFF (the program code) is in block RAM: no wait states, like the board's ROM. The bank
+  window 8000-BFFF is read through a 4 KB SDRAM cache with next-line prefetch; a demand miss holds
+  WAIT_n (~0.5 us); 1 miss in the first 5.3 s.
 * After any reset the sound board stays in reset ~84 us longer than the 68000 (jt10 needs a long
   reset); MAME releases both at once.
 * jt10's YM2610 busy flag duration and timer phases are the chip's; ymfm's are approximations.
@@ -59,6 +60,7 @@ Results so far:
 | Check | Result |
 | --- | --- |
 | `sim.sh sound +MS=60` (from the watchdog reset) | 109/109 Z80 I/O writes identical to MAME in order |
+| `sim.sh sound +MS=5300` (through the boot handshake and the Z80 ROM self-test) | 1428/1428 writes identical in order, max time offset 0.43 ms (the bench's longer sound reset; before the block-RAM/prefetch change: 28 ms, and a 17.5 s run had 3071 reordered writes) |
 | `sim.sh sound +ZPATCH +PRE01 +SHIFTFROM=13373328 +SHIFTAT=400000` (handshake 0x01, then MAME's latch writes from the attract-music command 0x05 on, moved to 0.4 s) + `audiocheck.py --mame-offset 15.9733 --start 0.45` | attract music 0.45-2.35 s: RMS ratio 0.97, 10 ms envelope correlation 0.972, log-spectrum correlation 0.995 |
 
 Simulation notes: ModelSim needs FPGA power-up zeros for jt10 (`sim/tb/zero_regs.do`); without

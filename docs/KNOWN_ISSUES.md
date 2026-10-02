@@ -11,11 +11,15 @@ Deviations from MAME that are deliberate or understood, and PCB facts that are u
    converts each frame with the palette of the following frame, so on frames where the game changes
    the palette MAME's output differs by those pixels; with the render-time palette the FPGA output
    equals MAME's render (scripts/syscheck.py reports this case separately).
-4. **CPU wait states.** The 68000 program ROM and the Z80 ROM are in SDRAM behind caches; a miss adds
-   1-2 wait states (68000) or ~0.5 us WAIT_n (Z80). MAME has no wait states, so CPU timing drifts
-   slightly from MAME; game logic is vblank-locked and frames still match.
-5. **Flip screen.** Implemented exactly as MAME: tilemaps flip, sprites and row scroll/select do not
-   (MAME's driver TODO, MACHINE_NO_COCKTAIL). The real flipped picture is unknown.
+4. **CPU wait states.** The 68000 program ROM is in SDRAM behind a cache; a miss adds 1-2 wait
+   states (MAME has none); game logic is vblank-locked and frames still match. The Z80's code area
+   (0000-7FFF) is in block RAM (no waits); its bank window (8000-BFFF) is cached with next-line
+   prefetch, so it practically never waits (1 miss in 5.3 s; before this change the Z80 fell 28 ms
+   behind MAME during its ROM self-test, which reordered later YM2610 writes).
+5. **Flip screen.** The game's Flip Screen DIP behaves exactly as in MAME: tilemaps flip, sprites and
+   row scroll/select do not, and gameplay is black (MAME's driver TODO, MACHINE_NO_COCKTAIL). The
+   real flipped picture is unknown. Use the OSD option *Flip screen (180)* instead: the core renders
+   the picture rotated 180 degrees (15 kHz and HDMI), independent of the game.
 6. **Sprite/tile priority** uses MAME's OR'ed priority bitmap (docs/VIDEO.md); unverified on a PCB.
 7. **Tile palette index** is kept to 12 bits ((colour + bank*0x40) % 0x200 * 16 can exceed the 4096
    palette entries for banks >= 4; the game uses banks 1 and 3; MAME would index past its palette).
