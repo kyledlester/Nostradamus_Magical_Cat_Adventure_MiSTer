@@ -19,7 +19,7 @@ screen rotation (top level); everything else is shared, as in MAME's driver.
    └─ sound latch / latch 2 ◄────────────────────► nost_sound (clk_snd = clk_sys/2: T80 4 MHz,
                                                      jt10 YM2610 8 MHz) ─► mono audio
  nost_video_timing (456 x 256 @ ce_pix = clk/14) ─► vblank at line 224: IRQ1 + sprite copy
- Nostradamus.sv: hps_io, pause, CRT Adjust, screen_rotate (ROT270 -> CCW, DDR3 FB), arcade_video
+ Nostradamus.sv: hps_io, pause, CRT Adjust, screen_rotate (OSD Orientation: Vertical CCW/CW, DDR3 FB), arcade_video
 ```
 
 ## Clocks

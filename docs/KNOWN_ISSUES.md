@@ -18,8 +18,8 @@ Deviations from MAME that are deliberate or understood, and PCB facts that are u
    behind MAME during its ROM self-test, which reordered later YM2610 writes).
 5. **Flip screen.** The game's Flip Screen DIP behaves exactly as in MAME: tilemaps flip, sprites and
    row scroll/select do not, and gameplay is black (MAME's driver TODO, MACHINE_NO_COCKTAIL). The
-   real flipped picture is unknown. Use the OSD option *Flip screen (180)* instead: the core renders
-   the picture rotated 180 degrees (15 kHz and HDMI), independent of the game.
+   real flipped picture is unknown. Use the OSD *Orientation: Flipped* instead: the core renders the
+   picture rotated 180 degrees (15 kHz and HDMI), independent of the game.
 6. **Sprite/tile priority** uses MAME's OR'ed priority bitmap (docs/VIDEO.md); unverified on a PCB.
 7. **Tile palette index** is kept to 12 bits ((colour + bank*0x40) % 0x200 * 16 can exceed the 4096
    palette entries for banks >= 4; the game uses banks 1 and 3; MAME would index past its palette).

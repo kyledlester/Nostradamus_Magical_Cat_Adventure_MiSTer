@@ -22,12 +22,12 @@
 5. Optional: second controller - coin and start player 2.
 6. Optional: OSD **DIP switches**: set *Service Mode* On, reset. Test screens appear; **Service** (R)
    cycles them (crosshatch, switch test, DIP display, sound test). Set it back to Off.
-7. Optional: OSD *Orientation* Horz on an analog 15 kHz CRT.
+7. Optional: OSD *Orientation* (Vertical CCW = upright on HDMI, the default; Horizontal / Flipped for a rotated CRT or TATE monitor).
 
 ### Magical Cat Adventure
 
 1. Load *Magical Cat Adventure*. Expect ~3 s of black (cold-boot watchdog wait), then the title.
-   The picture is horizontal (no rotation on HDMI; the OSD has no orientation items).
+   The picture is horizontal (OSD *Orientation: Horizontal*, the default; Vertical CCW/CW for a TATE monitor).
 2. The attract mode (title, demo play, high scores) is **silent in MAME too** - not a fault.
 3. Press **Coin** (Select), then **Start**: music should start with the game. Play stage 1: walk,
    **Jump** (B), **Fire** (A); check the scrolling backgrounds and sprites.

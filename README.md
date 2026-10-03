@@ -67,12 +67,20 @@ music start when a game is started.
 ## OSD options
 
 * **Aspect ratio**, **Scandoubler Fx**.
-* **Orientation** (Vert / Horz) and **Rotate CCW/CW** — Nostradamus only. On HDMI the vertical
-  game is rotated counter-clockwise; native 15 kHz output is the unrotated raster for a rotated
-  CRT. Magical Cat Adventure is horizontal and these items are hidden.
-* **Flip screen (180)** — the core turns the whole picture upside down (15 kHz and HDMI), for
-  cocktail-style or inverted monitors. Use this rather than the games' own *Flip Screen* DIP: that
-  DIP behaves as in MAME, which only flips the backgrounds (the drivers are marked "no cocktail").
+* **Orientation** — one item for every screen setup (same scheme as the Namco NA-1/NA-2 core). The
+  labels describe what happens to the board's raster:
+
+  | Setting | Picture | Nostradamus | Magical Cat Adventure / Catt |
+  | --- | --- | --- | --- |
+  | Horizontal | raster as is | TATE / rotated monitor or CRT | landscape screen (default) |
+  | Vertical CCW | HDMI scaler rotates 90° counter-clockwise | landscape screen, upright (default) | TATE monitor |
+  | Vertical CW | HDMI scaler rotates 90° clockwise | (upside down on landscape) | TATE monitor turned the other way |
+  | Flipped | 180° inside the core, 15 kHz and HDMI | TATE / rotated CRT turned the other way | inverted monitor |
+
+  Each game lists its natural setting first (the default). The 90° rotations are HDMI/scaler
+  modes; native 15 kHz output is never rotated 90° (rotate the monitor instead). Use *Flipped*
+  rather than the games' own *Flip Screen* DIP: that DIP behaves as in MAME, which only flips the
+  backgrounds (the drivers are marked "no cocktail").
 * **Tilemap engine** — *Cave 038* (default) uses the 038 layer processor from the
   [Arcade-Cave](https://github.com/MiSTer-devel/Arcade-Cave_MiSTer) core, adapted to this board;
   *MAME-matched* is this project's own 038 renderer. Both produce pixel-identical pictures to MAME

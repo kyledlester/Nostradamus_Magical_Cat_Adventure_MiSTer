@@ -1,4 +1,4 @@
-# Nostradamus / Magical Cat Adventure for MiSTer — beta 1 (2026-10-02)
+# Nostradamus / Magical Cat Adventure for MiSTer — beta 1 (2026-10-03)
 
 First public beta of a MiSTer core for Face's "LINDA" arcade board. One core file runs six MAME
 sets; pick the game with its MRA.
@@ -17,13 +17,13 @@ the clone zip.
 
 ## Download
 
-* Core: `Nostradamus_20261002.rbf` (SHA-1 `15f0729509b4f0e626a72864122b223b77c716de`)
+* Core: `Nostradamus_20261003.rbf` (SHA-1 `796c134bb176edd54870086d2e6a1145e05287b5`)
 * MRAs: `MRA/Nostradamus.mra`, `MRA/Magical Cat Adventure.mra` and the clones in
   `MRA/_alternatives/_Nostradamus/` and `MRA/_alternatives/_Magical Cat Adventure/`
 
 ## Installation
 
-1. Copy `Nostradamus_20261002.rbf` to `/media/fat/_Arcade/cores/` and remove any older
+1. Copy `Nostradamus_20261003.rbf` to `/media/fat/_Arcade/cores/` and remove any older
    `Nostradamus_*.rbf`.
 2. Copy the contents of `MRA/` (including `_alternatives/`) to `/media/fat/_Arcade/`. If you tried an earlier test build, replace
    `Nostradamus.mra` too: each MRA now tells the core which game it is.
@@ -40,10 +40,10 @@ Requires a DE10-Nano with an SDRAM module (32 MB or larger).
 * **Two tilemap engines** (OSD *Tilemap engine*): *Cave 038* (default) uses the 038 layer processor
   from the Arcade-Cave core, adapted to this board; *MAME-matched* is this project's own renderer.
   Both give pixel-identical pictures.
-* **Flip screen (180)** OSD option that turns the whole picture upside down on 15 kHz and HDMI
-  output, for inverted or cocktail-style monitors.
-* **Orientation / rotation** for Nostradamus (vertical) on HDMI; Magical Cat Adventure is
-  horizontal and is never rotated.
+* **One Orientation item for every screen setup** (Horizontal / Vertical CCW / Vertical CW /
+  Flipped, as in the Namco NA-1/NA-2 core): both games can be played on landscape screens, TATE
+  monitors (HDMI scaler rotation) and rotated or inverted CRTs (*Flipped* turns the picture 180°
+  on 15 kHz and HDMI). Each game defaults to its natural orientation.
 * **CRT Adjust** (H-size, H-position, V-shift) for 15 kHz CRTs, with the OSD staying visible.
 * **Pause** (L button, or automatically when the OSD is open) and a debug overlay.
 
@@ -69,7 +69,7 @@ The core has also been played on a DE10-Nano.
   MAME. Nostradamus then runs its self tests before the title. A MiSTer reset keeps work RAM, so
   later resets start at once.
 * **Magical Cat Adventure / Catt attract mode is silent**, as in MAME. Sound starts with a game.
-* **Use the OSD *Flip screen (180)*, not the games' own *Flip Screen* DIP.** The DIP behaves as in
+* **Use the OSD *Orientation: Flipped*, not the games' own *Flip Screen* DIP.** The DIP behaves as in
   MAME, which flips only the backgrounds; MAME marks both games "no cocktail".
 * **Magical Cat coin DIPs:** their meaning depends on the *Coin Mode* switch, so each choice is
   labelled with both readings ("Mode 1 / Mode 2").
