@@ -10,9 +10,11 @@ Hardware: 68000 @ 16 MHz, Z80 @ 4 MHz, YMF286-K (YM2610 compatible) @ 8 MHz, two
 and the FX1037 sprite custom (MAME driver `misc/mcatadv.cpp`). One core file runs every set; the
 MRA selects the game.
 
-**Status: beta.** Every set was checked in simulation against MAME 0.289 (ROM loading, CPU bus
-traffic, video frame by frame, sound chip writes and audio) and the core has been played on a
-DE10-Nano by the maintainer. Please report anything that differs from the arcade board or MAME.
+I created this core because I wanted to play these games on my MiSTer FPGA. I am posting it here and open sourcing it for everyone to enjoy and give feedback/make improvements. This core was created with the assistance of AI tooling.
+
+**Status: beta.** The core has been thoroughly tested on a
+DE10-Nano to the extent of my knowledge of these games. Every set was checked in simulation against MAME 0.289 (ROM loading, CPU bus
+traffic, video frame by frame, sound chip writes and audio).
 
 ## Supported sets
 
@@ -33,7 +35,8 @@ the clone zip plus its parent zip.
 
 1. Copy `Releases/Nostradamus_YYYYMMDD.rbf` to `/media/fat/_Arcade/cores/` (remove older
    `Nostradamus_*.rbf` files).
-2. Copy the `.mra` files from `mra/` to `/media/fat/_Arcade/`.
+2. Copy the contents of `MRA/` to `/media/fat/_Arcade/`: the parent MRAs at the top level, the
+   clones in `_alternatives/_Nostradamus/` and `_alternatives/_Magical Cat Adventure/`.
 3. Copy the ROM zips to `/media/fat/games/mame/`.
 4. Load a game from the Arcade menu.
 
@@ -42,10 +45,10 @@ live in SDRAM.
 
 **Expect a black screen for about 3 seconds at power-on.** Both programs write a signature to RAM
 on a cold start and wait for the board's watchdog to reset them (as on the arcade board and in
-MAME). Nostradamus then runs about 13 s of self tests before the title appears. A MiSTer reset
+MAME). Nostradamus then runs a brief number of self tests before the title appears. A MiSTer reset
 keeps work RAM, so later resets start at once.
 
-The Magical Cat Adventure / Catt attract mode is **silent** (it is silent in MAME too); sound and
+The Magical Cat Adventure / Catt attract mode is **silent**; sound and
 music start when a game is started.
 
 ## Controls
@@ -60,8 +63,6 @@ music start when a game is started.
 | Coin | Coin | Select |
 | Service (cycles the test-mode screens) | Service | R |
 | Pause (core) | Pause (core) | L |
-
-Player 2 uses the second controller.
 
 ## OSD options
 

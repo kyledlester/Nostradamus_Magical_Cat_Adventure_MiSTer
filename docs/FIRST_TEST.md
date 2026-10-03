@@ -5,7 +5,7 @@
 | Item | Path / value |
 | --- | --- |
 | RBF | `Releases/Nostradamus_YYYYMMDD.rbf` (see the release commit) -> `/media/fat/_Arcade/cores/` |
-| MRA | all six `mra/*.mra` (Nostradamus, Japan, Korea; Magical Cat Adventure, Japan; Catt) -> `/media/fat/_Arcade/` |
+| MRA | `MRA/` (parents + `_alternatives/` clones: Nostradamus Japan/Korea; Magical Cat Adventure Japan, Catt) -> `/media/fat/_Arcade/` |
 | ROM sets | MAME 0.289 `nost.zip`, `mcatadv.zip` and the clone zips `nostj`, `nostk`, `mcatadvj`, `catt` (split sets; the parent zip must be present too) -> `/media/fat/games/mame/` |
 | Platform | DE10-Nano with a 32 MB SDRAM module (required: all graphics, sound and program ROMs are in SDRAM) |
 

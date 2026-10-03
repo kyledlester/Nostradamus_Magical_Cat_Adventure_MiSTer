@@ -441,7 +441,9 @@ def interpret_mra(mra_path, data):
     return streams
 
 
-MRA_FILE = {g: GAMES[g]["title"] + ".mra" for g in GAMES}
+# MiSTer layout: parents in MRA/, clones in MRA/_alternatives/_<parent title>/
+MRA_FILE = {g: os.path.join(*(["_alternatives", "_" + GAMES[GAMES[g]["parent"]]["title"]] if "parent" in GAMES[g] else []),
+                            GAMES[g]["title"] + ".mra") for g in GAMES}
 
 
 def main():
@@ -453,7 +455,7 @@ def main():
     ap.add_argument("--mra", default=None)
     a = ap.parse_args()
     game = a.game
-    mra = a.mra or os.path.join(ROOT, "mra", MRA_FILE[game])
+    mra = a.mra or os.path.join(ROOT, "MRA", MRA_FILE[game])
     if a.cmd == "mra":
         path = a.out or mra
         os.makedirs(os.path.dirname(path), exist_ok=True)

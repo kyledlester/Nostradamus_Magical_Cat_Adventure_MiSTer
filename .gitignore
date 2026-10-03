@@ -46,3 +46,6 @@ Thumbs.db
 
 # RBFs are committed deliberately at release time only (git add -f)
 /Releases/*.rbf
+
+# jt10 simulation dumps
+/ch*.dec
