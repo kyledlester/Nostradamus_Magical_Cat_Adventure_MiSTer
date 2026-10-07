@@ -1,5 +1,7 @@
 # Nostradamus / Magical Cat Adventure (LINDA board) for MiSTer — beta
 
+<img width="444" height="636" alt="image" src="https://github.com/user-attachments/assets/ca5c8264-648d-4bbe-945e-440e96b89305" />
+
 MiSTer FPGA core for the two games on Face's "LINDA" arcade board:
 
 * **Nostradamus** (Face, 1993) — vertical shoot 'em up (LINDA25)
